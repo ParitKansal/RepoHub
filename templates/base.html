@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitClone</title>
+    <!-- Pico.css for fast, great looking default styles -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><strong><a href="/" class="contrast">GitClone</a></strong></li>
+        </ul>
+        <ul>
+            {% if user %}
+            <li><a href="/dashboard">Dashboard</a></li>
+            <li><a href="/logout" role="button" class="secondary">Logout</a></li>
+            {% else %}
+            <li><a href="/login">Login</a></li>
+            <li><a href="/register" role="button">Register</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    <main class="container">
+        {% if error %}
+        <article class="pico-background-pink-500">
+            {{ error }}
+        </article>
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

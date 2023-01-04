@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+    <header>Login</header>
+    <form action="/login" method="POST">
+        <label for="username">
+            Username
+            <input type="text" id="username" name="username" placeholder="Username" required>
+        </label>
+        
+        <label for="password">
+            Password
+            <input type="password" id="password" name="password" placeholder="Password" required>
+        </label>
+        
+        <button type="submit">Login</button>
+    </form>
+    <footer>Don't have an account? <a href="/register">Register</a></footer>
+</article>
+{% endblock %}
