@@ -29,11 +29,11 @@ async def read_root(request: Request, db: Session = Depends(get_db)):
     user = auth.get_current_user_from_cookie(request, db)
     if user:
         return RedirectResponse(url="/dashboard")
-    return templates.TemplateResponse("index.html", {"request": request, "user": None})
+    return templates.TemplateResponse(request=request, name="index.html", context={"user": None})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_get(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "user": None})
+    return templates.TemplateResponse(request=request, name="login.html", context={"user": None})
 
 @app.post("/login")
 async def login_post(
@@ -45,7 +45,7 @@ async def login_post(
 ):
     user = db.query(models.User).filter(models.User.username == username).first()
     if not user or not auth.verify_password(password, user.hashed_password):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid username or password", "user": None})
+        return templates.TemplateResponse(request=request, name="login.html", context={"error": "Invalid username or password", "user": None})
     
     access_token = auth.create_access_token(data={"sub": user.username})
     
@@ -57,7 +57,7 @@ async def login_post(
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_get(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request, "user": None})
+    return templates.TemplateResponse(request=request, name="register.html", context={"user": None})
 
 @app.post("/register")
 async def register_post(
@@ -65,12 +65,16 @@ async def register_post(
     username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    confirm_password: str = Form(...),
     db: Session = Depends(get_db)
 ):
+    if password != confirm_password:
+        return templates.TemplateResponse(request=request, name="register.html", context={"error": "Passwords do not match", "user": None})
+
     # Check if user exists
     existing_user = db.query(models.User).filter((models.User.username == username) | (models.User.email == email)).first()
     if existing_user:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "Username or Email already registered", "user": None})
+        return templates.TemplateResponse(request=request, name="register.html", context={"error": "Username or Email already registered", "user": None})
     
     hashed_password = auth.get_password_hash(password)
     new_user = models.User(username=username, email=email, hashed_password=hashed_password)
@@ -93,4 +97,4 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login")
     
     repositories = db.query(models.Repository).filter(models.Repository.owner_id == user.id).all()
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "repositories": repositories})
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "repositories": repositories})
