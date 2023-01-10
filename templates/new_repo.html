@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+    <header>Create a new repository</header>
+    <p>A repository contains all project files, including the revision history.</p>
+    
+    <form action="/repo/new" method="POST">
+        <label for="repo_name">
+            Repository name *
+            <input type="text" id="repo_name" name="repo_name" placeholder="my-awesome-project" required pattern="[a-zA-Z0-9_-]+">
+            <small>Great repository names are short and memorable. Need inspiration? How about <strong>stunning-waffle</strong>?</small>
+        </label>
+        
+        <label for="description">
+            Description <small>(optional)</small>
+            <input type="text" id="description" name="description">
+        </label>
+        
+        <hr>
+        <button type="submit">Create repository</button>
+    </form>
+</article>
+{% endblock %}
