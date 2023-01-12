@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid">
+    <div>
+        <hgroup>
+            <h2>{{ owner.username }} / {{ repo.name }}</h2>
+        </hgroup>
+    </div>
+</div>
+
+<nav>
+    <ul>
+        <li><a href="/{{ owner.username }}/{{ repo.name }}">Code</a></li>
+        <li><strong><a href="/{{ owner.username }}/{{ repo.name }}/commits">Commits</a></strong></li>
+    </ul>
+</nav>
+
+<article>
+    <header>Commit History</header>
+    {% if commits %}
+    <table role="grid">
+        <thead>
+            <tr>
+                <th>Commit</th>
+                <th>Author</th>
+                <th>Message</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in commits %}
+            <tr>
+                <td><code>{{ c.hash[:7] }}</code></td>
+                <td>{{ c.author }}</td>
+                <td>{{ c.message }}</td>
+                <td>{{ c.time_ago }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No commits found.</p>
+    {% endif %}
+</article>
+{% endblock %}

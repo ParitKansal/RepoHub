@@ -22,3 +22,72 @@ def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
     except subprocess.CalledProcessError as e:
         print(f"Error creating git repo: {e.stderr}")
         return False
+
+def is_repo_empty(repo_path: str) -> bool:
+    try:
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True
+        )
+        return False
+    except subprocess.CalledProcessError:
+        return True
+
+def get_repo_commits(repo_path: str, limit: int = 20) -> list:
+    if is_repo_empty(repo_path):
+        return []
+        
+    try:
+        result = subprocess.run(
+            ["git", "log", f"-n {limit}", "--pretty=format:%H|%an|%ar|%s"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        commits = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split('|', 3)
+                if len(parts) == 4:
+                    commits.append({
+                        "hash": parts[0],
+                        "author": parts[1],
+                        "time_ago": parts[2],
+                        "message": parts[3]
+                    })
+        return commits
+    except subprocess.CalledProcessError:
+        return []
+
+def get_repo_files(repo_path: str, ref: str = "HEAD") -> list:
+    if is_repo_empty(repo_path):
+        return []
+        
+    try:
+        result = subprocess.run(
+            ["git", "ls-tree", ref, "--name-only"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        files = [f for f in result.stdout.strip().split('\n') if f]
+        return files
+    except subprocess.CalledProcessError:
+        return []
+
+def get_file_content(repo_path: str, filepath: str, ref: str = "HEAD") -> str:
+    try:
+        result = subprocess.run(
+            ["git", "show", f"{ref}:{filepath}"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return result.stdout
+    except subprocess.CalledProcessError:
+        return None
