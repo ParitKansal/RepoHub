@@ -25,13 +25,14 @@ def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
 
 def is_repo_empty(repo_path: str) -> bool:
     try:
-        subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+        result = subprocess.run(
+            ["git", "rev-list", "-n", "1", "--all"],
             cwd=repo_path,
             check=True,
-            capture_output=True
+            capture_output=True,
+            text=True
         )
-        return False
+        return len(result.stdout.strip()) == 0
     except subprocess.CalledProcessError:
         return True
 
@@ -41,7 +42,7 @@ def get_repo_commits(repo_path: str, limit: int = 20) -> list:
         
     try:
         result = subprocess.run(
-            ["git", "log", f"-n {limit}", "--pretty=format:%H|%an|%ar|%s"],
+            ["git", "log", "--all", f"-n {limit}", "--pretty=format:%H|%an|%ar|%s"],
             cwd=repo_path,
             check=True,
             capture_output=True,
@@ -62,13 +63,23 @@ def get_repo_commits(repo_path: str, limit: int = 20) -> list:
     except subprocess.CalledProcessError:
         return []
 
-def get_repo_files(repo_path: str, ref: str = "HEAD") -> list:
+def get_repo_files(repo_path: str) -> list:
     if is_repo_empty(repo_path):
         return []
         
     try:
+        # Get the latest commit hash from any branch
+        result_hash = subprocess.run(
+            ["git", "rev-list", "-n", "1", "--all"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        latest_hash = result_hash.stdout.strip()
+        
         result = subprocess.run(
-            ["git", "ls-tree", ref, "--name-only"],
+            ["git", "ls-tree", latest_hash, "--name-only"],
             cwd=repo_path,
             check=True,
             capture_output=True,
@@ -79,10 +90,20 @@ def get_repo_files(repo_path: str, ref: str = "HEAD") -> list:
     except subprocess.CalledProcessError:
         return []
 
-def get_file_content(repo_path: str, filepath: str, ref: str = "HEAD") -> str:
+def get_file_content(repo_path: str, filepath: str) -> str:
     try:
+        # Get the latest commit hash from any branch
+        result_hash = subprocess.run(
+            ["git", "rev-list", "-n", "1", "--all"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        latest_hash = result_hash.stdout.strip()
+
         result = subprocess.run(
-            ["git", "show", f"{ref}:{filepath}"],
+            ["git", "show", f"{latest_hash}:{filepath}"],
             cwd=repo_path,
             check=True,
             capture_output=True,
