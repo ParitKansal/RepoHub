@@ -1,0 +1,22 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'issues' %}
+
+{% block repo_content %}
+<article>
+    <header>Create a new issue</header>
+    <form action="/{{ owner.username }}/{{ repo.name }}/issues/new" method="POST">
+        <label for="title">
+            Title *
+            <input type="text" id="title" name="title" required>
+        </label>
+        
+        <label for="description">
+            Description
+            <textarea id="description" name="description" rows="5"></textarea>
+        </label>
+        
+        <hr>
+        <button type="submit">Submit new issue</button>
+    </form>
+</article>
+{% endblock %}

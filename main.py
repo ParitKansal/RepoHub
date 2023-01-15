@@ -236,3 +236,107 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
         "filepath": filepath,
         "content": content
     })
+
+@app.get("/{username}/{repo_name}/issues", response_class=HTMLResponse)
+async def repo_issues(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="issues.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return templates.TemplateResponse(request=request, name="issues.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    issues = db.query(models.Issue).filter(models.Issue.repo_id == repo.id).all()
+    
+    return templates.TemplateResponse(request=request, name="issues.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "issues": issues
+    })
+
+@app.get("/{username}/{repo_name}/issues/new", response_class=HTMLResponse)
+async def new_issue_get(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    user = auth.get_current_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse(url="/login")
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return RedirectResponse(url="/dashboard")
+        
+    return templates.TemplateResponse(request=request, name="new_issue.html", context={
+        "user": user, 
+        "repo": repo, 
+        "owner": owner
+    })
+
+@app.post("/{username}/{repo_name}/issues/new")
+async def new_issue_post(
+    request: Request,
+    username: str, 
+    repo_name: str,
+    title: str = Form(...),
+    description: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    user = auth.get_current_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse(url="/login")
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return RedirectResponse(url="/dashboard")
+        
+    new_issue = models.Issue(
+        title=title, 
+        description=description, 
+        repo_id=repo.id, 
+        author_id=user.id
+    )
+    db.add(new_issue)
+    db.commit()
+    db.refresh(new_issue)
+    
+    return RedirectResponse(url=f"/{username}/{repo_name}/issues/{new_issue.id}", status_code=status.HTTP_302_FOUND)
+
+@app.get("/{username}/{repo_name}/issues/{issue_id}", response_class=HTMLResponse)
+async def issue_detail(request: Request, username: str, repo_name: str, issue_id: int, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return RedirectResponse(url="/dashboard")
+        
+    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
+    if not issue:
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues")
+        
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    return templates.TemplateResponse(request=request, name="issue_detail.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "issue": issue
+    })

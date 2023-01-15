@@ -1,20 +1,7 @@
-{% extends "base.html" %}
+{% extends "repo_base.html" %}
+{% set current_tab = 'code' %}
 
-{% block content %}
-<div class="grid">
-    <div>
-        <hgroup>
-            <h2>{{ owner.username }} / {{ repo.name }}</h2>
-        </hgroup>
-    </div>
-</div>
-
-<nav>
-    <ul>
-        <li><strong><a href="/{{ owner.username }}/{{ repo.name }}">Code</a></strong></li>
-        <li><a href="/{{ owner.username }}/{{ repo.name }}/commits">Commits</a></li>
-    </ul>
-</nav>
+{% block repo_content %}
 
 <article>
     <header>{{ filepath }}</header>
