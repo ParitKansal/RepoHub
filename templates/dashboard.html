@@ -1,28 +1,85 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid">
-    <div>
-        <h2>Dashboard</h2>
-        <p>Welcome back, <strong>{{ user.username }}</strong>!</p>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6">
+    
+    <!-- Left Sidebar: Profile & Repos List -->
+    <div class="md:col-span-1 border-r border-github-border pr-6">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-lg text-white">
+                {{ user.username[0]|upper }}
+            </div>
+            <div>
+                <h2 class="font-bold text-white">{{ user.username }}</h2>
+                <span class="text-xs text-gray-500">Developer</span>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-sm text-gray-300">Repositories</h3>
+            <a href="/repo/new" class="bg-github-green hover:bg-green-600 text-white text-xs font-semibold py-1 px-2 rounded transition-colors shadow flex items-center space-x-1">
+                <i class="fa-solid fa-plus"></i> <span>New</span>
+            </a>
+        </div>
+        
+        <input type="text" placeholder="Find a repository..." class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1 mb-4 text-sm focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-600">
+
+        <ul class="space-y-3">
+            {% for repo in user.repositories %}
+            <li>
+                <a href="/{{ user.username }}/{{ repo.name }}" class="flex items-center space-x-2 group">
+                    <div class="w-6 h-6 rounded-full bg-github-header border border-github-border flex items-center justify-center group-hover:bg-gray-800 transition-colors">
+                        <i class="fa-solid fa-user text-xs text-gray-400"></i>
+                    </div>
+                    <span class="text-sm text-gray-300 group-hover:text-github-blue group-hover:underline truncate">{{ user.username }}/{{ repo.name }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- Main Content Area: Feed / Explore -->
+    <div class="md:col-span-3">
+        <div class="border border-github-border rounded-lg bg-github-header overflow-hidden">
+            <div class="px-6 py-4 border-b border-github-border">
+                <h3 class="font-semibold text-lg text-white">Your Repositories</h3>
+            </div>
+            
+            <div class="divide-y divide-github-border">
+                {% if user.repositories %}
+                    {% for repo in user.repositories %}
+                    <div class="p-6 hover:bg-gray-800/30 transition-colors flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center space-x-2 mb-1">
+                                <a href="/{{ user.username }}/{{ repo.name }}" class="text-xl font-semibold text-github-blue hover:underline break-words">{{ repo.name }}</a>
+                                <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-gray-400 font-semibold">Public</span>
+                            </div>
+                            <p class="text-sm text-gray-400 mb-3 max-w-2xl">{{ repo.description or "No description provided." }}</p>
+                            <div class="flex items-center space-x-4 text-xs text-gray-500">
+                                <div class="flex items-center space-x-1">
+                                    <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+                                    <span>Python</span>
+                                </div>
+                                <div>Updated recently</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <button class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 px-3 py-1 rounded-md text-xs font-semibold flex items-center space-x-2 transition-colors">
+                                <i class="fa-regular fa-star"></i> <span>Star</span>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="p-8 text-center text-gray-400">
+                        <i class="fa-regular fa-folder-open text-4xl mb-3 opacity-50"></i>
+                        <p>You don't have any repositories yet.</p>
+                        <a href="/repo/new" class="text-github-blue hover:underline mt-2 inline-block">Create one now</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
-
-<article>
-    <header class="grid">
-        <div>Your Repositories</div>
-        <div style="text-align: right;">
-            <a href="/repo/new" role="button" class="outline">New Repository</a>
-        </div>
-    </header>
-    {% if repositories %}
-        <ul>
-        {% for repo in repositories %}
-            <li><strong><a href="/{{ user.username }}/{{ repo.name }}">{{ repo.name }}</a></strong>: {{ repo.description }}</li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>You don't have any repositories yet. (Repository creation coming in Phase 2!)</p>
-    {% endif %}
-</article>
 {% endblock %}

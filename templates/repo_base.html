@@ -1,24 +1,39 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid">
-    <div>
-        <hgroup>
-            <h2>{{ owner.username }} / {{ repo.name }}</h2>
-            {% if repo.description and current_tab == 'code' %}
-            <h3>{{ repo.description }}</h3>
-            {% endif %}
-        </hgroup>
+<div class="mt-4 mb-6">
+    <div class="flex items-center space-x-2 text-xl mb-4">
+        <i class="fa-solid fa-book-bookmark text-gray-400"></i>
+        <a href="/{{ owner.username }}" class="text-github-blue hover:underline">{{ owner.username }}</a>
+        <span class="text-gray-500">/</span>
+        <a href="/{{ owner.username }}/{{ repo.name }}" class="font-bold text-github-blue hover:underline">{{ repo.name }}</a>
+        <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-gray-400 font-semibold ml-2">Public</span>
+    </div>
+    
+    {% if repo.description and current_tab == 'code' %}
+    <p class="text-gray-400 text-sm mb-4">{{ repo.description }}</p>
+    {% endif %}
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-github-border mt-6">
+        <nav class="flex space-x-6 text-sm overflow-x-auto">
+            <a href="/{{ owner.username }}/{{ repo.name }}" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'code' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-code"></i>
+                <span>Code</span>
+            </a>
+            <a href="/{{ owner.username }}/{{ repo.name }}/issues" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'issues' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-regular fa-circle-dot"></i>
+                <span>Issues</span>
+            </a>
+            <a href="/{{ owner.username }}/{{ repo.name }}/commits" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'commits' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Commits</span>
+            </a>
+        </nav>
     </div>
 </div>
 
-<nav>
-    <ul>
-        <li>{% if current_tab == 'code' %}<strong>{% endif %}<a href="/{{ owner.username }}/{{ repo.name }}">Code</a>{% if current_tab == 'code' %}</strong>{% endif %}</li>
-        <li>{% if current_tab == 'commits' %}<strong>{% endif %}<a href="/{{ owner.username }}/{{ repo.name }}/commits">Commits</a>{% if current_tab == 'commits' %}</strong>{% endif %}</li>
-        <li>{% if current_tab == 'issues' %}<strong>{% endif %}<a href="/{{ owner.username }}/{{ repo.name }}/issues">Issues</a>{% if current_tab == 'issues' %}</strong>{% endif %}</li>
-    </ul>
-</nav>
-
-{% block repo_content %}{% endblock %}
+<div class="mt-6">
+    {% block repo_content %}{% endblock %}
+</div>
 {% endblock %}

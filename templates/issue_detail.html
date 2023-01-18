@@ -2,27 +2,99 @@
 {% set current_tab = 'issues' %}
 
 {% block repo_content %}
-<article>
-    <header class="grid">
-        <div>
-            <h2>{{ issue.title }} <small style="color: grey;">#{{ issue.id }}</small></h2>
-            <div>
-                {% if issue.status == 'Open' %}
-                <mark style="background-color: #2ecc71; color: white; padding: 5px; border-radius: 5px;">Open</mark>
-                {% else %}
-                <mark style="background-color: #e74c3c; color: white; padding: 5px; border-radius: 5px;">Closed</mark>
-                {% endif %}
-                <strong>{{ issue.author.username }}</strong> opened this issue
+<div class="mt-4">
+    <!-- Issue Header -->
+    <div class="mb-6 pb-6 border-b border-github-border">
+        <div class="flex items-start justify-between mb-2">
+            <h1 class="text-3xl text-white font-medium break-words">
+                {{ issue.title }} <span class="text-gray-500 font-light">#{{ issue.id }}</span>
+            </h1>
+            <a href="/{{ owner.username }}/{{ repo.name }}/issues/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-md text-sm shadow ml-4 flex-shrink-0">
+                New issue
+            </a>
+        </div>
+        
+        <div class="flex items-center text-sm">
+            {% if issue.status == 'Open' %}
+            <div class="bg-github-green text-white font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                <i class="fa-regular fa-circle-dot"></i>
+                <span>Open</span>
+            </div>
+            {% else %}
+            <div class="bg-purple-500 text-white font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                <i class="fa-solid fa-check"></i>
+                <span>Closed</span>
+            </div>
+            {% endif %}
+            
+            <div class="ml-3 text-gray-400">
+                <span class="font-semibold text-gray-300 hover:text-github-blue cursor-pointer">{{ issue.author.username }}</span> opened this issue
+                <span class="ml-2 text-gray-500">· 0 comments</span>
             </div>
         </div>
-    </header>
-    
-    <div>
-        {% if issue.description %}
-        <p style="white-space: pre-wrap;">{{ issue.description }}</p>
-        {% else %}
-        <p><em>No description provided.</em></p>
-        {% endif %}
     </div>
-</article>
+    
+    <!-- Issue Body Layout -->
+    <div class="flex flex-col md:flex-row gap-6">
+        <!-- Main Conversation Area -->
+        <div class="flex-1">
+            <div class="flex items-start space-x-4">
+                <!-- Avatar -->
+                <div class="hidden sm:block flex-shrink-0">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-lg text-white font-bold">
+                        {{ issue.author.username[0]|upper }}
+                    </div>
+                </div>
+                
+                <!-- Comment Box -->
+                <div class="flex-1 bg-github-dark border border-github-border rounded-lg relative overflow-hidden mb-6">
+                    <!-- Triangle pointer -->
+                    <div class="hidden sm:block absolute top-4 -left-2 w-3 h-3 bg-github-dark border-t border-l border-github-border transform -rotate-45"></div>
+                    
+                    <div class="bg-github-header border-b border-github-border px-4 py-2 flex justify-between items-center text-sm">
+                        <div class="text-gray-400">
+                            <span class="font-semibold text-gray-300">{{ issue.author.username }}</span> commented
+                        </div>
+                        <div class="border border-github-border rounded text-xs px-2 py-0.5 text-gray-400 font-semibold">Author</div>
+                    </div>
+                    
+                    <div class="p-4 text-white text-sm">
+                        {% if issue.description %}
+                        <p style="white-space: pre-wrap;" class="leading-relaxed">{{ issue.description }}</p>
+                        {% else %}
+                        <p class="text-gray-500 italic">No description provided.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Mock Add Comment Box -->
+            <div class="flex items-start space-x-4 mt-8 pt-8 border-t border-github-border">
+                <div class="hidden sm:block flex-shrink-0">
+                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-lg text-white font-bold">
+                        {{ user.username[0]|upper }}
+                    </div>
+                </div>
+                <div class="flex-1 border border-github-border rounded-lg p-2 bg-github-header">
+                    <textarea rows="3" placeholder="Leave a comment" class="w-full bg-github-dark border border-github-border rounded-md px-3 py-2 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-500 text-sm resize-y" disabled></textarea>
+                    <div class="flex justify-end mt-2">
+                        <button class="bg-github-green opacity-50 cursor-not-allowed text-white font-semibold py-1.5 px-3 rounded-md text-sm" disabled>Comment</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="w-full md:w-1/4">
+            <div class="border-b border-github-border pb-4 mb-4 text-sm">
+                <div class="font-semibold text-gray-300 mb-2">Assignees</div>
+                <div class="text-gray-500">No one assigned</div>
+            </div>
+            <div class="border-b border-github-border pb-4 mb-4 text-sm">
+                <div class="font-semibold text-gray-300 mb-2">Labels</div>
+                <div class="text-gray-500">None yet</div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
