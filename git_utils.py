@@ -63,6 +63,47 @@ def get_repo_commits(repo_path: str, limit: int = 20) -> list:
     except subprocess.CalledProcessError:
         return []
 
+def get_commit_details(repo_path: str, commit_hash: str) -> dict:
+    """
+    Retrieves the metadata and the raw diff for a specific commit.
+    """
+    if not os.path.exists(repo_path):
+        return None
+        
+    try:
+        # Get metadata
+        meta_result = subprocess.run(
+            ["git", "show", commit_hash, "-s", "--format=%an|%ad|%s"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        parts = meta_result.stdout.strip().split("|", 2)
+        if len(parts) != 3:
+            return None
+        author, date, message = parts
+        
+        # Get diff patch
+        diff_result = subprocess.run(
+            ["git", "show", commit_hash, "--pretty=format:", "--patch"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        diff = diff_result.stdout.strip()
+        
+        return {
+            "hash": commit_hash,
+            "author": author,
+            "date": date,
+            "message": message,
+            "diff": diff
+        }
+    except subprocess.CalledProcessError:
+        return None
+
 def get_repo_files(repo_path: str) -> list:
     if is_repo_empty(repo_path):
         return []

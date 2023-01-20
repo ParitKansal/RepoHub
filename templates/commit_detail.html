@@ -1,0 +1,56 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'commits' %}
+
+{% block repo_content %}
+<div class="mt-4">
+    <!-- Commit Header -->
+    <div class="mb-6 pb-6 border-b border-github-border">
+        <h1 class="text-2xl text-white font-medium break-words mb-2">
+            {{ commit.message }}
+        </h1>
+        
+        <div class="flex items-center text-sm text-gray-400">
+            <div class="flex items-center space-x-2 mr-4">
+                <div class="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs text-white">
+                    {{ commit.author[0]|upper }}
+                </div>
+                <span class="font-semibold text-gray-300 hover:text-github-blue cursor-pointer">{{ commit.author }}</span>
+            </div>
+            <span>committed on {{ commit.date }}</span>
+            
+            <div class="ml-auto flex items-center space-x-4">
+                <span class="font-mono text-xs text-github-blue">{{ commit.hash }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Diff View -->
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden shadow-sm">
+        <div class="bg-github-header border-b border-github-border px-4 py-3 flex justify-between items-center text-sm font-semibold text-gray-300">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-file-code text-gray-500"></i>
+                <span>Changes</span>
+            </div>
+        </div>
+        <div class="overflow-x-auto bg-[#0d1117] text-sm font-mono leading-relaxed pb-4">
+            {% if commit.diff %}
+                {% for line in commit.diff.split('\n') %}
+                    {% if line.startswith('+') and not line.startswith('+++') %}
+                        <div class="bg-green-900/30 text-green-400 px-4 whitespace-pre">{{ line }}</div>
+                    {% elif line.startswith('-') and not line.startswith('---') %}
+                        <div class="bg-red-900/30 text-red-400 px-4 whitespace-pre">{{ line }}</div>
+                    {% elif line.startswith('@@') %}
+                        <div class="bg-blue-900/20 text-blue-400 px-4 py-1 whitespace-pre my-2">{{ line }}</div>
+                    {% elif line.startswith('diff') or line.startswith('index') or line.startswith('---') or line.startswith('+++') %}
+                        <div class="text-gray-500 font-bold px-4 whitespace-pre">{{ line }}</div>
+                    {% else %}
+                        <div class="text-gray-300 px-4 whitespace-pre">{{ line }}</div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="p-4 text-gray-500 italic">No diff available (empty commit or binary files).</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
