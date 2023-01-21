@@ -63,6 +63,27 @@ def get_repo_commits(repo_path: str, limit: int = 20) -> list:
     except subprocess.CalledProcessError:
         return []
 
+def parse_diff(diff_text: str) -> list:
+    if not diff_text:
+        return []
+    files = []
+    current_file = None
+    
+    for line in diff_text.split('\n'):
+        if line.startswith('diff --git'):
+            if current_file:
+                files.append(current_file)
+            parts = line.split(' ')
+            filename = parts[-1][2:] if len(parts) >= 4 else "unknown"
+            current_file = {"name": filename, "lines": []}
+        elif current_file is not None:
+            current_file["lines"].append(line)
+            
+    if current_file:
+        files.append(current_file)
+        
+    return files
+
 def get_commit_details(repo_path: str, commit_hash: str) -> dict:
     """
     Retrieves the metadata and the raw diff for a specific commit.
@@ -92,14 +113,15 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
             text=True,
             check=True
         )
-        diff = diff_result.stdout.strip()
+        diff_text = diff_result.stdout.strip()
+        diff_files = parse_diff(diff_text)
         
         return {
             "hash": commit_hash,
             "author": author,
             "date": date,
             "message": message,
-            "diff": diff
+            "diff_files": diff_files
         }
     except subprocess.CalledProcessError:
         return None

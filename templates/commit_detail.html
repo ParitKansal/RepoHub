@@ -25,32 +25,36 @@
     </div>
     
     <!-- Diff View -->
-    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden shadow-sm">
-        <div class="bg-github-header border-b border-github-border px-4 py-3 flex justify-between items-center text-sm font-semibold text-gray-300">
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid fa-file-code text-gray-500"></i>
-                <span>Changes</span>
+    {% if commit.diff_files %}
+        {% for file in commit.diff_files %}
+        <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden shadow-sm mb-6">
+            <div class="bg-github-header border-b border-github-border px-4 py-3 flex justify-between items-center text-sm font-semibold text-gray-300">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-file-code text-gray-500"></i>
+                    <span>{{ file.name }}</span>
+                </div>
             </div>
-        </div>
-        <div class="overflow-x-auto bg-[#0d1117] text-sm font-mono leading-relaxed pb-4">
-            {% if commit.diff %}
-                {% for line in commit.diff.split('\n') %}
+            <div class="overflow-x-auto bg-[#0d1117] text-sm font-mono leading-relaxed pb-4 pt-2">
+                {% for line in file.lines %}
                     {% if line.startswith('+') and not line.startswith('+++') %}
                         <div class="bg-green-900/30 text-green-400 px-4 whitespace-pre">{{ line }}</div>
                     {% elif line.startswith('-') and not line.startswith('---') %}
                         <div class="bg-red-900/30 text-red-400 px-4 whitespace-pre">{{ line }}</div>
                     {% elif line.startswith('@@') %}
                         <div class="bg-blue-900/20 text-blue-400 px-4 py-1 whitespace-pre my-2">{{ line }}</div>
-                    {% elif line.startswith('diff') or line.startswith('index') or line.startswith('---') or line.startswith('+++') %}
+                    {% elif line.startswith('diff') or line.startswith('index') or line.startswith('---') or line.startswith('+++') or line.startswith('new file') or line.startswith('deleted file') %}
                         <div class="text-gray-500 font-bold px-4 whitespace-pre">{{ line }}</div>
                     {% else %}
                         <div class="text-gray-300 px-4 whitespace-pre">{{ line }}</div>
                     {% endif %}
                 {% endfor %}
-            {% else %}
-                <div class="p-4 text-gray-500 italic">No diff available (empty commit or binary files).</div>
-            {% endif %}
+            </div>
         </div>
-    </div>
+        {% endfor %}
+    {% else %}
+        <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden shadow-sm mb-6">
+            <div class="p-4 text-gray-500 italic">No diff available (empty commit or binary files).</div>
+        </div>
+    {% endif %}
 </div>
 {% endblock %}
