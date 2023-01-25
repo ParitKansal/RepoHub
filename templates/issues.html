@@ -6,12 +6,12 @@
     <div class="flex justify-between items-center mb-4">
         <div class="flex space-x-2">
             <div class="bg-github-dark border border-github-border rounded-md flex overflow-hidden text-sm">
-                <button class="px-3 py-1 font-semibold text-white bg-github-header border-r border-github-border">
-                    <i class="fa-regular fa-circle-dot mr-1"></i> Open
-                </button>
-                <button class="px-3 py-1 text-gray-400 hover:text-white transition-colors">
-                    <i class="fa-solid fa-check mr-1"></i> Closed
-                </button>
+                <a href="?state=open" class="px-3 py-1 font-semibold {% if state == 'open' %}text-white bg-github-header{% else %}text-gray-400 hover:text-white transition-colors{% endif %} border-r border-github-border flex items-center">
+                    <i class="fa-regular fa-circle-dot mr-1"></i> Open ({{ open_count }})
+                </a>
+                <a href="?state=closed" class="px-3 py-1 font-semibold {% if state == 'closed' %}text-white bg-github-header{% else %}text-gray-400 hover:text-white transition-colors{% endif %} flex items-center">
+                    <i class="fa-solid fa-check mr-1"></i> Closed ({{ closed_count }})
+                </a>
             </div>
         </div>
         <a href="/{{ owner.username }}/{{ repo.name }}/issues/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1.5 px-3 rounded-md text-sm transition-colors shadow">
@@ -21,7 +21,11 @@
     
     <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden">
         <div class="bg-github-header border-b border-github-border px-4 py-3 flex items-center text-sm font-semibold text-gray-300">
+            {% if state == 'closed' %}
+            <i class="fa-solid fa-check text-gray-400 mr-2"></i> {{ issues|length }} Closed
+            {% else %}
             <i class="fa-regular fa-circle-dot text-gray-400 mr-2"></i> {{ issues|length }} Open
+            {% endif %}
         </div>
         
         <div class="divide-y divide-github-border">

@@ -267,7 +267,7 @@ async def commit_detail(request: Request, username: str, repo_name: str, commit_
     })
 
 @app.get("/{username}/{repo_name}/issues", response_class=HTMLResponse)
-async def repo_issues(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+async def repo_issues(request: Request, username: str, repo_name: str, state: str = "open", db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
         return templates.TemplateResponse(request=request, name="issues.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
@@ -280,15 +280,26 @@ async def repo_issues(request: Request, username: str, repo_name: str, db: Sessi
     if not repo:
         return templates.TemplateResponse(request=request, name="issues.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
         
-    current_user = auth.get_current_user_from_cookie(request, db)
+    open_count = db.query(models.Issue).filter(models.Issue.repo_id == repo.id, models.Issue.status == "Open").count()
+    closed_count = db.query(models.Issue).filter(models.Issue.repo_id == repo.id, models.Issue.status == "Closed").count()
     
-    issues = db.query(models.Issue).filter(models.Issue.repo_id == repo.id).all()
+    query = db.query(models.Issue).filter(models.Issue.repo_id == repo.id)
+    if state.lower() == "closed":
+        query = query.filter(models.Issue.status == "Closed")
+    else:
+        query = query.filter(models.Issue.status == "Open")
+        
+    issues = query.all()
+    current_user = auth.get_current_user_from_cookie(request, db)
     
     return templates.TemplateResponse(request=request, name="issues.html", context={
         "user": current_user, 
         "repo": repo, 
         "owner": owner,
-        "issues": issues
+        "issues": issues,
+        "state": state.lower(),
+        "open_count": open_count,
+        "closed_count": closed_count
     })
 
 @app.get("/{username}/{repo_name}/issues/new", response_class=HTMLResponse)
