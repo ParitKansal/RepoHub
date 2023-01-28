@@ -29,7 +29,7 @@
             <li>
                 <a href="/{{ user.username }}/{{ repo.name }}" class="flex items-center space-x-2 group">
                     <div class="w-6 h-6 rounded-full bg-github-header border border-github-border flex items-center justify-center group-hover:bg-gray-800 transition-colors">
-                        <i class="fa-solid fa-user text-xs text-gray-400"></i>
+                        <i class="{% if repo.is_private %}fa-solid fa-lock text-yellow-500{% else %}fa-solid fa-user text-gray-400{% endif %} text-xs"></i>
                     </div>
                     <span class="text-sm text-gray-300 group-hover:text-github-blue group-hover:underline truncate">{{ user.username }}/{{ repo.name }}</span>
                 </a>
@@ -52,7 +52,11 @@
                         <div>
                             <div class="flex items-center space-x-2 mb-1">
                                 <a href="/{{ user.username }}/{{ repo.name }}" class="text-xl font-semibold text-github-blue hover:underline break-words">{{ repo.name }}</a>
+                                {% if repo.is_private %}
+                                <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-yellow-500 font-semibold"><i class="fa-solid fa-lock mr-1"></i>Private</span>
+                                {% else %}
                                 <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-gray-400 font-semibold">Public</span>
+                                {% endif %}
                             </div>
                             <p class="text-sm text-gray-400 mb-3 max-w-2xl">{{ repo.description or "No description provided." }}</p>
                             <div class="flex items-center space-x-4 text-xs text-gray-500">

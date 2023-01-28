@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 import datetime
 from sqlalchemy.orm import relationship
@@ -20,6 +20,7 @@ class Repository(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     description = Column(Text, nullable=True)
+    is_private = Column(Boolean, default=False)
     owner_id = Column(Integer, ForeignKey("users.id"))
     
     owner = relationship("User", back_populates="repositories")

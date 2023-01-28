@@ -7,7 +7,11 @@
         <a href="/{{ owner.username }}" class="text-github-blue hover:underline">{{ owner.username }}</a>
         <span class="text-gray-500">/</span>
         <a href="/{{ owner.username }}/{{ repo.name }}" class="font-bold text-github-blue hover:underline">{{ repo.name }}</a>
+        {% if repo.is_private %}
+        <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-yellow-500 font-semibold ml-2"><i class="fa-solid fa-lock mr-1"></i>Private</span>
+        {% else %}
         <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-gray-400 font-semibold ml-2">Public</span>
+        {% endif %}
     </div>
     
     {% if repo.description and current_tab == 'code' %}
