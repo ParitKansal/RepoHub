@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+    
+    <!-- Search Filters -->
+    <div class="w-full md:w-1/4">
+        <h2 class="text-xl font-bold text-white mb-4">Filter by</h2>
+        <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden">
+            <ul class="text-sm">
+                <li>
+                    <a href="#" class="block px-4 py-2 bg-gray-800 text-white font-semibold border-b border-github-border">
+                        Repositories
+                        <span class="float-right bg-github-header px-2 py-0.5 rounded-full text-xs border border-github-border">{{ results|length }}</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="block px-4 py-2 text-gray-400 hover:bg-gray-800 hover:text-white border-b border-github-border transition-colors">
+                        Code
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="block px-4 py-2 text-gray-400 hover:bg-gray-800 hover:text-white border-b border-github-border transition-colors">
+                        Commits
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="block px-4 py-2 text-gray-400 hover:bg-gray-800 hover:text-white border-b border-github-border transition-colors">
+                        Issues
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="block px-4 py-2 text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+                        Users
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Search Results -->
+    <div class="w-full md:w-3/4">
+        <h1 class="text-2xl font-semibold text-white mb-6 border-b border-github-border pb-4">
+            {{ results|length }} repository result{% if results|length != 1 %}s{% endif %}
+        </h1>
+        
+        <div class="divide-y divide-github-border">
+            {% for r in results %}
+            <div class="py-6 flex flex-col">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i class="fa-regular fa-bookmark text-gray-400"></i>
+                    <a href="/{{ r.owner.username }}/{{ r.name }}" class="text-xl font-semibold text-github-blue hover:underline break-all">
+                        {{ r.owner.username }}/{{ r.name }}
+                    </a>
+                </div>
+                <p class="text-sm text-gray-400 mb-3 max-w-2xl">{{ r.description or 'No description provided.' }}</p>
+                <div class="flex items-center space-x-4 text-xs text-gray-500">
+                    <div class="flex items-center space-x-1">
+                        <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
+                        <span>Python</span>
+                    </div>
+                    <div>Updated recently</div>
+                </div>
+            </div>
+            {% else %}
+            <div class="py-12 text-center text-gray-400">
+                <i class="fa-solid fa-magnifying-glass text-4xl mb-4 text-gray-500"></i>
+                <h3 class="text-xl font-bold text-white mb-2">We couldn't find any repositories matching '{{ query }}'</h3>
+                <p>Try searching for a different keyword or checking your spelling.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

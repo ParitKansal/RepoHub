@@ -95,6 +95,27 @@ async def logout():
     response.delete_cookie("access_token")
     return response
 
+@app.get("/search", response_class=HTMLResponse)
+async def search_repositories(request: Request, q: str = "", db: Session = Depends(get_db)):
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    # Simple search by name or description for public repos
+    query = db.query(models.Repository).filter(models.Repository.is_private == False)
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (models.Repository.name.ilike(search_term)) | 
+            (models.Repository.description.ilike(search_term))
+        )
+        
+    results = query.all()
+    
+    return templates.TemplateResponse(request=request, name="search_results.html", context={
+        "user": current_user,
+        "query": q,
+        "results": results
+    })
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     user = auth.get_current_user_from_cookie(request, db)
