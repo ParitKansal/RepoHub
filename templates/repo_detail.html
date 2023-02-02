@@ -62,5 +62,17 @@
         {% endfor %}
     </div>
 </div>
+
+    {% if readme_html %}
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden mt-6">
+        <div class="bg-github-header border-b border-github-border px-4 py-3 flex items-center space-x-2 text-sm font-semibold text-white">
+            <i class="fa-solid fa-list text-gray-500"></i>
+            <span>README.md</span>
+        </div>
+        <div class="p-8 prose prose-invert max-w-none prose-a:text-github-blue">
+            {{ readme_html | safe }}
+        </div>
+    </div>
+    {% endif %}
 {% endif %}
 {% endblock %}
