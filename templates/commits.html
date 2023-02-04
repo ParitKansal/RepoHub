@@ -3,8 +3,40 @@
 
 {% block repo_content %}
 <div class="mt-4">
-    <div class="mb-4">
+    <div class="mb-4 flex justify-between items-center">
         <h3 class="text-xl font-semibold text-white">Commit History</h3>
+        
+        {% if branches %}
+        <div class="relative inline-block text-left">
+            <button type="button" class="inline-flex justify-center w-full rounded-md border border-github-border shadow-sm px-4 py-2 bg-github-dark text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-github-dark focus:ring-github-blue" id="branch-menu-button-commits" aria-expanded="true" aria-haspopup="true" onclick="document.getElementById('branch-dropdown-commits').classList.toggle('hidden')">
+                <i class="fa-solid fa-code-branch mr-2 text-gray-400"></i>
+                {{ current_branch }}
+                <i class="fa-solid fa-caret-down ml-2 -mr-1 text-gray-400"></i>
+            </button>
+            <div class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-github-header border border-github-border ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-10" id="branch-dropdown-commits" role="menu" aria-orientation="vertical" aria-labelledby="branch-menu-button-commits" tabindex="-1">
+                <div class="py-1" role="none">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 border-b border-github-border">Switch branches</div>
+                    {% for b in branches %}
+                    <a href="?branch={{ b }}" class="text-white hover:bg-github-blue hover:text-white block px-4 py-2 text-sm {% if b == current_branch %}bg-gray-800 font-bold{% endif %}" role="menuitem" tabindex="-1">
+                        <i class="fa-solid fa-check mr-2 {% if b != current_branch %}invisible{% endif %}"></i> {{ b }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            // Close the dropdown if the user clicks outside of it
+            window.addEventListener('click', function(event) {
+                if (!event.target.closest('#branch-menu-button-commits')) {
+                    var dropdown = document.getElementById('branch-dropdown-commits');
+                    if (dropdown && !dropdown.classList.contains('hidden')) {
+                        dropdown.classList.add('hidden');
+                    }
+                }
+            });
+        </script>
+        {% endif %}
     </div>
     
     <div class="border border-github-border rounded-lg bg-github-dark">

@@ -243,7 +243,7 @@ async def new_repo_post(
     return RedirectResponse(url=f"/{user.username}/{repo_name}", status_code=status.HTTP_302_FOUND)
 
 @app.get("/{username}/{repo_name}", response_class=HTMLResponse)
-async def repo_detail(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+async def repo_detail(request: Request, username: str, repo_name: str, branch: str = "main", db: Session = Depends(get_db)):
     # Look up the owner
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
@@ -268,8 +268,12 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
     readme_html = None
     
     if not is_empty:
-        files = git_utils.get_repo_files(repo_path)
-        commits = git_utils.get_repo_commits(repo_path, limit=1)
+        branches = git_utils.get_branches(repo_path)
+        if branch not in branches and branches:
+            branch = branches[0]
+            
+        files = git_utils.get_repo_files(repo_path, branch=branch)
+        commits = git_utils.get_repo_commits(repo_path, limit=1, branch=branch)
         if commits:
             latest_commit = commits[0]
             
@@ -277,7 +281,7 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
         for file in files:
             if file['name'].lower() == 'readme.md' and file['type'] == 'blob':
                 try:
-                    readme_content = git_utils.get_file_content(repo_path, file['name'])
+                    readme_content = git_utils.get_file_content(repo_path, file['name'], branch=branch)
                     if readme_content:
                         readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
                 except Exception:
@@ -290,11 +294,13 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
         "is_empty": is_empty,
         "files": files,
         "latest_commit": latest_commit,
-        "readme_html": readme_html
+        "readme_html": readme_html,
+        "branches": git_utils.get_branches(repo_path) if not is_empty else [],
+        "current_branch": branch
     })
 
 @app.get("/{username}/{repo_name}/commits", response_class=HTMLResponse)
-async def repo_commits(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+async def repo_commits(request: Request, username: str, repo_name: str, branch: str = "main", db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
         return templates.TemplateResponse(request=request, name="commits.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
@@ -310,13 +316,23 @@ async def repo_commits(request: Request, username: str, repo_name: str, db: Sess
         return templates.TemplateResponse(request=request, name="commits.html", context={"error": "Repository not found", "user": current_user})
         
     repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
-    commits = git_utils.get_repo_commits(repo_path, limit=50)
     
+    commits = []
+    branches = []
+    
+    if not git_utils.is_repo_empty(repo_path):
+        branches = git_utils.get_branches(repo_path)
+        if branch not in branches and branches:
+            branch = branches[0]
+        commits = git_utils.get_repo_commits(repo_path, limit=50, branch=branch)
+        
     return templates.TemplateResponse(request=request, name="commits.html", context={
         "user": current_user, 
         "repo": repo, 
         "owner": owner,
-        "commits": commits
+        "commits": commits,
+        "branches": branches,
+        "current_branch": branch
     })
 
 @app.get("/{username}/{repo_name}/settings", response_class=HTMLResponse)
@@ -366,7 +382,7 @@ async def delete_repo(request: Request, username: str, repo_name: str, db: Sessi
     return RedirectResponse(url="/dashboard", status_code=303)
 
 @app.get("/{username}/{repo_name}/blob/{filepath:path}", response_class=HTMLResponse)
-async def repo_blob(request: Request, username: str, repo_name: str, filepath: str, db: Session = Depends(get_db)):
+async def repo_blob(request: Request, username: str, repo_name: str, filepath: str, branch: str = "main", db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
         return templates.TemplateResponse(request=request, name="file_view.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
@@ -383,14 +399,19 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
         
     repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
     
-    content = git_utils.get_file_content(repo_path, filepath)
+    branches = git_utils.get_branches(repo_path)
+    if branch not in branches and branches:
+        branch = branches[0]
+        
+    content = git_utils.get_file_content(repo_path, filepath, branch=branch)
     
     return templates.TemplateResponse(request=request, name="file_view.html", context={
         "user": current_user, 
         "repo": repo, 
         "owner": owner,
         "filepath": filepath,
-        "content": content
+        "content": content,
+        "current_branch": branch
     })
 
 @app.get("/{username}/{repo_name}/commit/{commit_hash}", response_class=HTMLResponse)
