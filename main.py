@@ -335,6 +335,34 @@ async def repo_commits(request: Request, username: str, repo_name: str, branch: 
         "current_branch": branch
     })
 
+@app.get("/{username}/{repo_name}/branches", response_class=HTMLResponse)
+async def repo_branches(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="branches.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="branches.html", context={"error": "Repository not found", "user": current_user})
+        
+    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    branches = []
+    if not git_utils.is_repo_empty(repo_path):
+        branches = git_utils.get_branches(repo_path)
+        
+    return templates.TemplateResponse(request=request, name="branches.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "branches": branches
+    })
+
 @app.get("/{username}/{repo_name}/settings", response_class=HTMLResponse)
 async def repo_settings(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
     current_user = auth.get_current_user_from_cookie(request, db)
