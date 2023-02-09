@@ -26,6 +26,7 @@ class Repository(Base):
     owner = relationship("User", back_populates="repositories")
     issues = relationship("Issue", back_populates="repository")
     stars = relationship("Star", back_populates="repository")
+    pull_requests = relationship("PullRequest", back_populates="repository")
 
 class Issue(Base):
     __tablename__ = "issues"
@@ -64,3 +65,20 @@ class Star(Base):
     
     user = relationship("User")
     repository = relationship("Repository", back_populates="stars")
+
+class PullRequest(Base):
+    __tablename__ = "pull_requests"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    status = Column(String, default="Open") # Open, Merged, Closed
+    source_branch = Column(String)
+    target_branch = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    repo_id = Column(Integer, ForeignKey("repositories.id"))
+    author_id = Column(Integer, ForeignKey("users.id"))
+    
+    repository = relationship("Repository", back_populates="pull_requests")
+    author = relationship("User")

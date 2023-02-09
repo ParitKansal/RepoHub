@@ -1,0 +1,114 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'pulls' %}
+
+{% block repo_content %}
+<div class="mt-4">
+    <h2 class="text-xl font-semibold text-white mb-4">Compare branches & open a pull request</h2>
+
+    <!-- Branch Selector -->
+    <div class="border border-github-border rounded-lg bg-github-dark p-4 mb-6">
+        <form method="GET" class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400 font-medium">Base:</label>
+                <select name="base" class="bg-github-header border border-github-border text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-github-blue">
+                    {% for branch in branches %}
+                    <option value="{{ branch }}" {% if branch == base %}selected{% endif %}>{{ branch }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <i class="fa-solid fa-arrow-left text-gray-500"></i>
+            <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-400 font-medium">Compare:</label>
+                <select name="compare" class="bg-github-header border border-github-border text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:border-github-blue">
+                    {% for branch in branches %}
+                    <option value="{{ branch }}" {% if branch == compare %}selected{% endif %}>{{ branch }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="bg-github-blue hover:bg-blue-600 text-white font-semibold py-1.5 px-4 rounded-md text-sm transition-colors">
+                Compare
+            </button>
+        </form>
+    </div>
+
+    {% if base == compare %}
+    <div class="border border-yellow-700 bg-yellow-900/20 rounded-lg p-4 mb-6 text-yellow-400 text-sm flex items-center gap-2">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Base and compare branches are the same. Choose different branches to see the diff.</span>
+    </div>
+    {% elif diff_files %}
+
+    <!-- PR Creation Form -->
+    <div class="border border-github-border rounded-lg bg-github-dark p-5 mb-6">
+        <h3 class="text-white font-semibold text-base mb-4">Open a pull request</h3>
+        <form method="POST">
+            <input type="hidden" name="base" value="{{ base }}">
+            <input type="hidden" name="compare" value="{{ compare }}">
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 font-medium mb-1">Title <span class="text-red-400">*</span></label>
+                <input type="text" name="title" required
+                    placeholder="Pull request title"
+                    class="w-full bg-github-header border border-github-border text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:border-github-blue">
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm text-gray-400 font-medium mb-1">Description <span class="text-gray-600">(optional)</span></label>
+                <textarea name="description" rows="4"
+                    placeholder="Describe the changes in this pull request..."
+                    class="w-full bg-github-header border border-github-border text-white rounded-md px-3 py-2 text-sm focus:outline-none focus:border-github-blue resize-none"></textarea>
+            </div>
+            <div class="flex justify-end">
+                <button type="submit" class="bg-github-green hover:bg-green-600 text-white font-semibold py-2 px-5 rounded-md text-sm transition-colors">
+                    <i class="fa-solid fa-code-pull-request mr-2"></i>Create pull request
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Diff Preview -->
+    <div class="mb-2 text-sm text-gray-400 font-medium">
+        Showing <span class="text-white font-semibold">{{ diff_files|length }}</span> changed file{{ 's' if diff_files|length != 1 else '' }}
+        &mdash;
+        <span class="font-mono text-gray-400">{{ compare }}</span>
+        <i class="fa-solid fa-arrow-right mx-1"></i>
+        <span class="font-mono text-gray-400">{{ base }}</span>
+    </div>
+
+    {% for file in diff_files %}
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden shadow-sm mb-4">
+        <div class="bg-github-header border-b border-github-border px-4 py-3 flex items-center text-sm font-semibold text-gray-300">
+            <i class="fa-solid fa-file-code text-gray-500 mr-2"></i>
+            <span>{{ file.name }}</span>
+        </div>
+        <div class="overflow-x-auto bg-[#0d1117] text-sm font-mono leading-relaxed pb-4 pt-2">
+            {% for line in file.lines %}
+                {% if line.startswith('+') and not line.startswith('+++') %}
+                    <div class="bg-green-900/30 text-green-400 px-4 whitespace-pre">{{ line }}</div>
+                {% elif line.startswith('-') and not line.startswith('---') %}
+                    <div class="bg-red-900/30 text-red-400 px-4 whitespace-pre">{{ line }}</div>
+                {% elif line.startswith('@@') %}
+                    <div class="bg-blue-900/20 text-blue-400 px-4 py-1 whitespace-pre my-2">{{ line }}</div>
+                {% elif line.startswith('diff') or line.startswith('index') or line.startswith('---') or line.startswith('+++') or line.startswith('new file') or line.startswith('deleted file') %}
+                    <div class="text-gray-500 font-bold px-4 whitespace-pre">{{ line }}</div>
+                {% else %}
+                    <div class="text-gray-300 px-4 whitespace-pre">{{ line }}</div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% elif branches|length < 2 %}
+    <div class="border border-github-border rounded-lg bg-github-dark p-8 text-center">
+        <i class="fa-solid fa-code-branch text-3xl text-gray-500 mb-4"></i>
+        <h3 class="text-lg font-semibold text-white mb-2">Not enough branches</h3>
+        <p class="text-gray-400">You need at least two branches to open a pull request.</p>
+    </div>
+    {% else %}
+    <div class="border border-github-border bg-github-dark rounded-lg p-6 text-center text-gray-400">
+        <i class="fa-solid fa-check-circle text-green-400 text-2xl mb-3"></i>
+        <p class="font-semibold text-white">These branches are identical.</p>
+        <p class="text-sm mt-1">There are no differences between <span class="font-mono text-gray-300">{{ compare }}</span> and <span class="font-mono text-gray-300">{{ base }}</span>.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -56,7 +56,15 @@
                 <i class="fa-solid fa-clock-rotate-left"></i>
                 <span>Commits</span>
             </a>
-            
+            <a href="/{{ owner.username }}/{{ repo.name }}/pulls" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'pulls' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-code-pull-request"></i>
+                <span>Pull Requests</span>
+                {% set open_prs = repo.pull_requests | selectattr('status', 'equalto', 'Open') | list %}
+                {% if open_prs %}
+                <span class="bg-github-header border border-github-border rounded-full px-2 py-0.5 text-xs">{{ open_prs|length }}</span>
+                {% endif %}
+            </a>
+
             {% if user and user.id == owner.id %}
             <a href="/{{ owner.username }}/{{ repo.name }}/settings" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'settings' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
                 <i class="fa-solid fa-gear"></i>
