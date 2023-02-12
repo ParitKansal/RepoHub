@@ -65,6 +65,11 @@
                 {% endif %}
             </a>
 
+            <a href="/{{ owner.username }}/{{ repo.name }}/network" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'network' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span>Network</span>
+            </a>
+
             {% if user and user.id == owner.id %}
             <a href="/{{ owner.username }}/{{ repo.name }}/settings" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'settings' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
                 <i class="fa-solid fa-gear"></i>

@@ -20,10 +20,14 @@
                         {{ b }}
                     </a>
                 </div>
-                <div>
+                <div class="flex items-center space-x-3">
                     <a href="/{{ owner.username }}/{{ repo.name }}/commits?branch={{ b }}" class="text-xs text-gray-400 hover:text-github-blue flex items-center space-x-1">
                         <i class="fa-solid fa-clock-rotate-left"></i>
                         <span>View commits</span>
+                    </a>
+                    <a href="/{{ owner.username }}/{{ repo.name }}/network?branch={{ b }}" class="text-xs text-gray-400 hover:text-github-blue flex items-center space-x-1">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        <span>Graph</span>
                     </a>
                 </div>
             </div>
