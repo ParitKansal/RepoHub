@@ -90,24 +90,13 @@
     const HASH_W  = 58;   // width reserved for short-hash text
     const MSG_MAX_CHARS = 55;
 
-    const COLORS = [
-        '#58a6ff', // blue
-        '#3fb950', // green
-        '#f78166', // salmon
-        '#d2a8ff', // lavender
-        '#ffa657', // orange
-        '#ff7b72', // red
-        '#79c0ff', // sky blue
-        '#56d364', // lime green
-        '#e3b341', // gold
-        '#f778ba', // pink
-        '#bc8cff', // violet
-        '#00d4aa', // teal
-        '#ff9f43', // amber
-        '#48cae4', // cyan
-        '#ff4d6d', // rose
-        '#b5e48c', // pale green
-    ];
+    // Generate a visually distinct color for any lane index using the
+    // golden-angle hue distribution — adjacent lanes always get maximally
+    // separated hues, so this works correctly for 2 branches or 200.
+    function laneToColor(lane) {
+        const hue = (lane * 137.508) % 360;
+        return `hsl(${hue.toFixed(1)}, 72%, 62%)`;
+    }
 
     /* ── Tooltip helpers ────────────────────────────────────── */
     const tooltip = document.getElementById('graph-tooltip');
@@ -186,7 +175,7 @@
         const laneColor = {};
         commits.forEach(c => {
             if (laneColor[c.lane] === undefined)
-                laneColor[c.lane] = COLORS[c.lane % COLORS.length];
+                laneColor[c.lane] = laneToColor(c.lane);
         });
 
         /* ── SVG geometry ── */
@@ -234,7 +223,7 @@
                 const parent = commits[pi];
                 const x1 = cx(commit.lane), y1 = cy(ri);
                 const x2 = cx(parent.lane), y2 = cy(pi);
-                const color = laneColor[commit.lane] || COLORS[0];
+                const color = laneColor[commit.lane] || laneToColor(0);
 
                 if (commit.lane === parent.lane) {
                     // Same lane → straight vertical line
@@ -275,7 +264,7 @@
         /* ── Circles ── */
         commits.forEach((commit, ri) => {
             const x = cx(commit.lane), y = cy(ri);
-            const color = laneColor[commit.lane] || COLORS[0];
+            const color = laneColor[commit.lane] || laneToColor(0);
             const isMerge = commit.parents.length > 1;
 
             g.append('circle')
@@ -340,7 +329,7 @@
         Object.entries(branchTips).forEach(([name, hash]) => {
             const idx = indexOf[hash];
             if (idx === undefined) return;
-            const color = laneColor[commits[idx].lane] || COLORS[0];
+            const color = laneColor[commits[idx].lane] || laneToColor(0);
             if (seenBranches.has(name)) return;
             seenBranches.add(name);
             const span = document.createElement('span');
