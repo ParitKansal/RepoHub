@@ -178,6 +178,12 @@
                 laneColor[c.lane] = laneToColor(c.lane);
         });
 
+        // main/master is always blue regardless of which lane it landed in
+        const mainHash = branchTips['main'] || branchTips['master'];
+        if (mainHash !== undefined && indexOf[mainHash] !== undefined) {
+            laneColor[commits[indexOf[mainHash]].lane] = '#58a6ff';
+        }
+
         /* ── SVG geometry ── */
         // Graph column ends here (x coords of circles stay here)
         const graphColW = PAD_L + laneCount * LANE_W;
