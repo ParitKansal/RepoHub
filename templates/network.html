@@ -192,8 +192,11 @@
 
         // main/master is always blue regardless of which lane it landed in
         const mainHash = branchTips['main'] || branchTips['master'];
-        if (mainHash !== undefined && indexOf[mainHash] !== undefined) {
+        if (mainHash && indexOf[mainHash] !== undefined) {
             laneColor[commits[indexOf[mainHash]].lane] = MAIN_BLUE;
+        } else {
+            // Fallback: topo-order always puts main's newest commit first → lane 0
+            laneColor[0] = MAIN_BLUE;
         }
 
         /* ── SVG geometry ── */

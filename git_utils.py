@@ -278,15 +278,17 @@ def get_branch_tips(repo_path: str) -> dict:
     if is_repo_empty(repo_path):
         return {}
     try:
+        # git show-ref --heads always outputs full 40-char hashes
         result = subprocess.run(
-            ["git", "branch", "--format=%(refname:short)|%(objectname)"],
+            ["git", "show-ref", "--heads"],
             cwd=repo_path, check=True, capture_output=True, text=True
         )
         tips = {}
         for line in result.stdout.strip().split('\n'):
-            if '|' in line:
-                name, commit_hash = line.split('|', 1)
-                tips[name.strip()] = commit_hash.strip()
+            if ' ' in line:
+                commit_hash, ref = line.split(' ', 1)
+                name = ref.strip().replace('refs/heads/', '')
+                tips[name] = commit_hash.strip()
         return tips
     except subprocess.CalledProcessError:
         return {}
