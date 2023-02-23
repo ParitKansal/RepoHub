@@ -397,7 +397,7 @@ async def repo_network(request: Request, username: str, repo_name: str, branch: 
     })
 
 @app.get("/{username}/{repo_name}/graph-data")
-async def repo_graph_data(username: str, repo_name: str, branch: str = "__all__", db: Session = Depends(get_db)):
+async def repo_graph_data(request: Request, username: str, repo_name: str, branch: str = "__all__", db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
         return JSONResponse({"error": "User not found"}, status_code=404)
@@ -407,7 +407,9 @@ async def repo_graph_data(username: str, repo_name: str, branch: str = "__all__"
         models.Repository.name == repo_name
     ).first()
 
-    if not repo:
+    current_user = auth.get_current_user_from_cookie(request, db)
+
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
         return JSONResponse({"error": "Repository not found"}, status_code=404)
 
     repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
