@@ -1,12 +1,35 @@
-version: '3.8'
-
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: gitclone
+      POSTGRES_USER: gitclone
+      POSTGRES_PASSWORD: gitclone
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitclone"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   web:
-    build: .
+    build: ./backend
     ports:
       - "8080:8000"
     volumes:
-      - .:/app
+      - ./repos:/repos
+      - ./frontend:/app/frontend
     environment:
       - PYTHONUNBUFFERED=1
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - DATABASE_URL=postgresql://gitclone:gitclone@postgres:5432/gitclone
+      - SECRET_KEY=changeme-use-a-real-secret-in-production
+      - REPOS_DIR=/repos
+      - TEMPLATES_DIR=/app/frontend/templates
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata:

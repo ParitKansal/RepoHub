@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GitClone</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        github: {
+                            dark: '#0d1117',
+                            darker: '#010409',
+                            border: '#30363d',
+                            header: '#161b22',
+                            text: '#c9d1d9',
+                            blue: '#58a6ff',
+                            green: '#2ea043',
+                            red: '#da3633'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-github-dark text-github-text min-h-screen font-sans antialiased">
+    
+    <!-- Top Navigation Bar -->
+    <nav class="bg-github-header border-b border-github-border text-white px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/" class="text-white hover:text-gray-300 flex items-center space-x-2">
+                <i class="fa-brands fa-github text-3xl"></i>
+                <span class="text-xl font-semibold tracking-tight">GitClone</span>
+            </a>
+            
+            {% if user %}
+            <!-- Search Bar -->
+            <div class="hidden md:flex ml-4">
+                <form action="/search" method="GET" class="relative">
+                    <input type="text" name="q" placeholder="Search or jump to..." class="bg-github-dark border border-github-border rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue w-64 placeholder-gray-500" required>
+                    <button type="submit" class="absolute right-2 top-1.5 text-xs text-gray-500 border border-gray-600 rounded px-1 hover:text-white hover:border-gray-400">↵</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="flex items-center space-x-4 text-sm font-semibold">
+            {% if user %}
+                <a href="/dashboard" class="hover:text-github-blue transition-colors">Dashboard</a>
+                <div class="flex items-center space-x-2">
+                    <div class="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs text-white">
+                        {{ user.username[0]|upper }}
+                    </div>
+                    <span>{{ user.username }}</span>
+                </div>
+                <a href="/logout" class="text-gray-400 hover:text-white transition-colors"><i class="fa-solid fa-sign-out-alt"></i></a>
+            {% else %}
+                <a href="/login" class="hover:text-white text-gray-300 transition-colors">Sign in</a>
+                <a href="/register" class="border border-gray-500 hover:border-white text-gray-300 hover:text-white rounded-md px-3 py-1 transition-colors">Sign up</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% block content %}
+        {% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="border-t border-github-border mt-12 py-8 text-center text-xs text-gray-500">
+        <p>&copy; 2026 GitClone Inc. All rights reserved.</p>
+    </footer>
+</body>
+</html>

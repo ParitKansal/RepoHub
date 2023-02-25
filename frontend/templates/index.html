@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center py-20 text-center">
+    <div class="mb-8">
+        <i class="fa-brands fa-github text-9xl text-white"></i>
+    </div>
+    <h1 class="text-5xl font-extrabold text-white mb-6 tracking-tight">Where the world builds software</h1>
+    <p class="text-xl text-gray-400 max-w-2xl mb-10">
+        Millions of developers and companies build, ship, and maintain their software on GitClone—the largest and most advanced development platform in the world.
+    </p>
+    
+    <div class="flex space-x-4">
+        <a href="/register" class="bg-github-green hover:bg-green-600 text-white font-bold py-3 px-8 rounded-md text-lg transition-colors shadow-lg">Sign up for GitClone</a>
+        <a href="/login" class="bg-github-border hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-md text-lg transition-colors border border-gray-500">Sign in</a>
+    </div>
+    
+    <div class="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+        <div class="bg-github-header p-6 rounded-lg border border-github-border hover:border-gray-500 transition-colors">
+            <i class="fa-solid fa-code-branch text-2xl text-purple-400 mb-4"></i>
+            <h3 class="text-xl font-bold text-white mb-2">Version Control</h3>
+            <p class="text-gray-400 text-sm">Host and review code, manage projects, and build software alongside millions of other developers.</p>
+        </div>
+        <div class="bg-github-header p-6 rounded-lg border border-github-border hover:border-gray-500 transition-colors">
+            <i class="fa-regular fa-circle-check text-2xl text-github-green mb-4"></i>
+            <h3 class="text-xl font-bold text-white mb-2">Issue Tracking</h3>
+            <p class="text-gray-400 text-sm">Keep track of bugs, feature requests, and tasks with our integrated issue tracker.</p>
+        </div>
+        <div class="bg-github-header p-6 rounded-lg border border-github-border hover:border-gray-500 transition-colors">
+            <i class="fa-solid fa-rocket text-2xl text-blue-400 mb-4"></i>
+            <h3 class="text-xl font-bold text-white mb-2">Built for speed</h3>
+            <p class="text-gray-400 text-sm">Experience incredibly fast pushes and pulls thanks to our optimized backend infrastructure.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'code' %}
+
+{% block repo_content %}
+<div class="border border-github-border rounded-lg bg-github-dark overflow-hidden mt-4 shadow-sm">
+    <div class="bg-github-header border-b border-github-border px-4 py-3 flex justify-between items-center text-sm font-semibold text-gray-300">
+        <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-file-code text-gray-500"></i>
+            <span>{{ filepath }}</span>
+        </div>
+        <div>
+            <button class="border border-github-border rounded px-3 py-1 hover:bg-gray-800 transition-colors text-xs font-semibold">Raw</button>
+        </div>
+    </div>
+    <div class="p-4 overflow-x-auto bg-[#0d1117]">
+        <pre class="text-sm font-mono leading-relaxed"><code class="text-gray-300">{{ content }}</code></pre>
+    </div>
+</div>
+{% endblock %}

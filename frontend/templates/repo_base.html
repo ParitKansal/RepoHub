@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mt-4 mb-6">
+    <div class="flex items-center space-x-2 text-xl mb-4">
+        <i class="fa-solid fa-book-bookmark text-gray-400"></i>
+        <a href="/{{ owner.username }}" class="text-github-blue hover:underline">{{ owner.username }}</a>
+        <span class="text-gray-500">/</span>
+        <a href="/{{ owner.username }}/{{ repo.name }}" class="font-bold text-github-blue hover:underline">{{ repo.name }}</a>
+        {% if repo.is_private %}
+        <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-yellow-500 font-semibold ml-2"><i class="fa-solid fa-lock mr-1"></i>Private</span>
+        {% else %}
+        <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-gray-400 font-semibold ml-2">Public</span>
+        {% endif %}
+        
+        <div class="flex-grow"></div>
+        
+        {% if user %}
+        <form action="/{{ owner.username }}/{{ repo.name }}/star" method="POST" class="inline">
+            <button type="submit" class="border border-github-border bg-github-dark hover:bg-gray-800 text-sm font-semibold rounded-md px-3 py-1 transition-colors flex items-center">
+                {% set starred = namespace(value=false) %}
+                {% for s in repo.stars %}
+                    {% if s.user_id == user.id %}
+                        {% set starred.value = true %}
+                    {% endif %}
+                {% endfor %}
+                {% if starred.value %}
+                <i class="fa-solid fa-star text-yellow-500 mr-2"></i>
+                <span>Starred</span>
+                {% else %}
+                <i class="fa-regular fa-star text-gray-400 mr-2"></i>
+                <span>Star</span>
+                {% endif %}
+                <span class="bg-github-header rounded-full px-2 py-0.5 text-xs border border-github-border ml-2">{{ repo.stars|length }}</span>
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    
+    {% if repo.description and current_tab == 'code' %}
+    <p class="text-gray-400 text-sm mb-4">{{ repo.description }}</p>
+    {% endif %}
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-github-border mt-6">
+        <nav class="flex space-x-6 text-sm overflow-x-auto">
+            <a href="/{{ owner.username }}/{{ repo.name }}" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'code' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-code"></i>
+                <span>Code</span>
+            </a>
+            <a href="/{{ owner.username }}/{{ repo.name }}/issues" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'issues' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-regular fa-circle-dot"></i>
+                <span>Issues</span>
+            </a>
+            <a href="/{{ owner.username }}/{{ repo.name }}/commits" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'commits' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Commits</span>
+            </a>
+            <a href="/{{ owner.username }}/{{ repo.name }}/pulls" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'pulls' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-code-pull-request"></i>
+                <span>Pull Requests</span>
+                {% set open_prs = repo.pull_requests | selectattr('status', 'equalto', 'Open') | list %}
+                {% if open_prs %}
+                <span class="bg-github-header border border-github-border rounded-full px-2 py-0.5 text-xs">{{ open_prs|length }}</span>
+                {% endif %}
+            </a>
+
+            <a href="/{{ owner.username }}/{{ repo.name }}/network" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'network' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span>Network</span>
+            </a>
+
+            {% if user and user.id == owner.id %}
+            <a href="/{{ owner.username }}/{{ repo.name }}/settings" class="flex items-center space-x-2 pb-3 px-1 {% if current_tab == 'settings' %}border-b-2 border-[#f78166] text-white font-semibold{% else %}text-gray-400 hover:text-white hover:border-b-2 hover:border-gray-500 transition-colors{% endif %}">
+                <i class="fa-solid fa-gear"></i>
+                <span>Settings</span>
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+</div>
+
+<div class="mt-6">
+    {% block repo_content %}{% endblock %}
+</div>
+{% endblock %}

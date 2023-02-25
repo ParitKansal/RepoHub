@@ -34,3 +34,14 @@ plan.md
 # Database
 gitclone.db
 *.sqlite3
+
+# Docker
+pgdata/
+
+# Backend env file (contains secrets)
+backend/.env
+
+# Compiled bytecache
+backend/**/__pycache__/
+backend/**/*.pyc
+PRODUCTION_TODO.md 

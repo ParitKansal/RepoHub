@@ -1,0 +1,43 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'code' %}
+
+{% block repo_content %}
+<div class="max-w-4xl mx-auto py-6">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-normal text-white">Branches</h2>
+    </div>
+
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden">
+        <div class="bg-github-header px-4 py-3 border-b border-github-border font-semibold text-white text-sm">
+            All Branches
+        </div>
+        <div class="divide-y divide-github-border">
+            {% for b in branches %}
+            <div class="px-4 py-4 hover:bg-gray-800/30 transition-colors flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-code-branch text-gray-500"></i>
+                    <a href="/{{ owner.username }}/{{ repo.name }}?branch={{ b }}" class="bg-blue-900/40 text-github-blue hover:bg-blue-900/60 px-2 py-0.5 rounded text-sm font-mono font-semibold transition-colors">
+                        {{ b }}
+                    </a>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a href="/{{ owner.username }}/{{ repo.name }}/commits?branch={{ b }}" class="text-xs text-gray-400 hover:text-github-blue flex items-center space-x-1">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>View commits</span>
+                    </a>
+                    <a href="/{{ owner.username }}/{{ repo.name }}/network?branch={{ b }}" class="text-xs text-gray-400 hover:text-github-blue flex items-center space-x-1">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        <span>Graph</span>
+                    </a>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-gray-500">
+                <i class="fa-solid fa-code-branch text-4xl mb-3 opacity-50"></i>
+                <p>No branches found.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

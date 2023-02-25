@@ -1,0 +1,61 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'issues' %}
+
+{% block repo_content %}
+<div class="mt-4">
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex space-x-2">
+            <div class="bg-github-dark border border-github-border rounded-md flex overflow-hidden text-sm">
+                <a href="?state=open" class="px-3 py-1 font-semibold {% if state == 'open' %}text-white bg-github-header{% else %}text-gray-400 hover:text-white transition-colors{% endif %} border-r border-github-border flex items-center">
+                    <i class="fa-regular fa-circle-dot mr-1"></i> Open ({{ open_count }})
+                </a>
+                <a href="?state=closed" class="px-3 py-1 font-semibold {% if state == 'closed' %}text-white bg-github-header{% else %}text-gray-400 hover:text-white transition-colors{% endif %} flex items-center">
+                    <i class="fa-solid fa-check mr-1"></i> Closed ({{ closed_count }})
+                </a>
+            </div>
+        </div>
+        <a href="/{{ owner.username }}/{{ repo.name }}/issues/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1.5 px-3 rounded-md text-sm transition-colors shadow">
+            New issue
+        </a>
+    </div>
+    
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden">
+        <div class="bg-github-header border-b border-github-border px-4 py-3 flex items-center text-sm font-semibold text-gray-300">
+            {% if state == 'closed' %}
+            <i class="fa-solid fa-check text-gray-400 mr-2"></i> {{ issues|length }} Closed
+            {% else %}
+            <i class="fa-regular fa-circle-dot text-gray-400 mr-2"></i> {{ issues|length }} Open
+            {% endif %}
+        </div>
+        
+        <div class="divide-y divide-github-border">
+            {% for issue in issues %}
+            <div class="p-4 hover:bg-gray-800/30 transition-colors flex items-start group">
+                <div class="mt-1 mr-3 flex-shrink-0">
+                    {% if issue.status == 'Open' %}
+                    <i class="fa-regular fa-circle-dot text-github-green text-lg"></i>
+                    {% else %}
+                    <i class="fa-solid fa-circle-check text-purple-500 text-lg"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-1">
+                    <a href="/{{ owner.username }}/{{ repo.name }}/issues/{{ issue.id }}" class="text-white font-semibold text-base group-hover:text-github-blue">{{ issue.title }}</a>
+                    <div class="text-xs text-gray-500 mt-1">
+                        #{{ issue.id }} opened {{ issue.status|lower }} by <a href="#" class="hover:text-github-blue">{{ issue.author.username }}</a>
+                    </div>
+                </div>
+                <div class="hidden sm:flex text-gray-500 text-sm items-center">
+                    <i class="fa-regular fa-message mr-1"></i> 0
+                </div>
+            </div>
+            {% else %}
+            <div class="p-12 text-center">
+                <i class="fa-regular fa-circle-dot text-3xl text-gray-500 mb-4"></i>
+                <h3 class="text-xl font-semibold text-white mb-2">No open issues</h3>
+                <p class="text-gray-400">There are no open issues. Create one to get started.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

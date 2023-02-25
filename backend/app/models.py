@@ -1,0 +1,89 @@
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Boolean
+from sqlalchemy.orm import relationship
+import datetime
+from .database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+
+    repositories = relationship("Repository", back_populates="owner")
+
+
+class Repository(Base):
+    __tablename__ = "repositories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    is_private = Column(Boolean, default=False)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    owner = relationship("User", back_populates="repositories")
+    issues = relationship("Issue", back_populates="repository")
+    stars = relationship("Star", back_populates="repository")
+    pull_requests = relationship("PullRequest", back_populates="repository")
+
+
+class Issue(Base):
+    __tablename__ = "issues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    status = Column(String, default="Open")
+    repo_id = Column(Integer, ForeignKey("repositories.id"))
+    author_id = Column(Integer, ForeignKey("users.id"))
+
+    repository = relationship("Repository", back_populates="issues")
+    author = relationship("User")
+    comments = relationship("Comment", back_populates="issue")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    issue_id = Column(Integer, ForeignKey("issues.id"))
+    author_id = Column(Integer, ForeignKey("users.id"))
+
+    issue = relationship("Issue", back_populates="comments")
+    author = relationship("User")
+
+
+class Star(Base):
+    __tablename__ = "stars"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    repo_id = Column(Integer, ForeignKey("repositories.id"))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+    repository = relationship("Repository", back_populates="stars")
+
+
+class PullRequest(Base):
+    __tablename__ = "pull_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(Text, nullable=True)
+    status = Column(String, default="Open")  # Open, Merged, Closed
+    source_branch = Column(String)
+    target_branch = Column(String)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    repo_id = Column(Integer, ForeignKey("repositories.id"))
+    author_id = Column(Integer, ForeignKey("users.id"))
+
+    repository = relationship("Repository", back_populates="pull_requests")
+    author = relationship("User")

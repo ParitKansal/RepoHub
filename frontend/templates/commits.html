@@ -1,0 +1,77 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'commits' %}
+
+{% block repo_content %}
+<div class="mt-4">
+    <div class="mb-4 flex justify-between items-center">
+        <h3 class="text-xl font-semibold text-white">Commit History</h3>
+        
+        {% if branches %}
+        <div class="relative inline-block text-left">
+            <button type="button" class="inline-flex justify-center w-full rounded-md border border-github-border shadow-sm px-4 py-2 bg-github-dark text-sm font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-github-dark focus:ring-github-blue" id="branch-menu-button-commits" aria-expanded="true" aria-haspopup="true" onclick="document.getElementById('branch-dropdown-commits').classList.toggle('hidden')">
+                <i class="fa-solid fa-code-branch mr-2 text-gray-400"></i>
+                {{ current_branch }}
+                <i class="fa-solid fa-caret-down ml-2 -mr-1 text-gray-400"></i>
+            </button>
+            <div class="origin-top-right absolute right-0 mt-2 rounded-md shadow-lg bg-github-header border border-github-border ring-1 ring-black ring-opacity-5 focus:outline-none hidden z-10" id="branch-dropdown-commits" role="menu" aria-orientation="vertical" aria-labelledby="branch-menu-button-commits" tabindex="-1" style="min-width:220px;max-width:360px;max-height:360px;overflow-y:auto;">
+                <div class="py-1" role="none">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 border-b border-github-border sticky top-0 bg-github-header">Switch branches</div>
+                    {% for b in branches %}
+                    <a href="?branch={{ b }}" class="text-white hover:bg-github-blue hover:text-white flex items-center px-4 py-2 text-sm {% if b == current_branch %}bg-gray-800 font-bold{% endif %}" role="menuitem" tabindex="-1" title="{{ b }}">
+                        <i class="fa-solid fa-check mr-2 flex-shrink-0 {% if b != current_branch %}invisible{% endif %}"></i><span class="truncate">{{ b }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            // Close the dropdown if the user clicks outside of it
+            window.addEventListener('click', function(event) {
+                if (!event.target.closest('#branch-menu-button-commits')) {
+                    var dropdown = document.getElementById('branch-dropdown-commits');
+                    if (dropdown && !dropdown.classList.contains('hidden')) {
+                        dropdown.classList.add('hidden');
+                    }
+                }
+            });
+        </script>
+        {% endif %}
+    </div>
+    
+    <div class="border border-github-border rounded-lg bg-github-dark">
+        <div class="divide-y divide-github-border">
+            {% for commit in commits %}
+            <div class="p-4 hover:bg-gray-800/30 transition-colors flex items-start space-x-4">
+                <!-- Avatar placeholder -->
+                <div class="mt-1 flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-r from-gray-600 to-gray-500 flex items-center justify-center text-xs text-white">
+                    <i class="fa-solid fa-code-commit"></i>
+                </div>
+                
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <a href="/{{ owner.username }}/{{ repo.name }}/commit/{{ commit.hash }}" class="text-white font-semibold text-sm hover:text-github-blue cursor-pointer truncate mr-4 block">{{ commit.message }}</a>
+                        <div class="flex items-center space-x-2">
+                            <a href="/{{ owner.username }}/{{ repo.name }}/commit/{{ commit.hash }}" class="text-xs font-mono bg-github-header border border-github-border text-github-blue hover:text-white px-2 py-1 rounded truncate w-24 text-center transition-colors">{{ commit.hash[:7] }}</a>
+                            <button class="bg-github-header border border-github-border text-gray-400 hover:text-white px-2 py-1 rounded" title="Browse files at this point in history">
+                                <i class="fa-solid fa-code"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500 flex items-center space-x-1">
+                        <span class="font-semibold text-gray-300">{{ commit.author }}</span>
+                        <span>committed</span>
+                        <span>{{ commit.date }}</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-gray-500">
+                <i class="fa-solid fa-clock-rotate-left text-3xl mb-2"></i>
+                <p>No commits found.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
