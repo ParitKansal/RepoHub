@@ -19,6 +19,9 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="GitClone College Project")
 
+# Serve static files
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
+
 # Setup templates
 templates = Jinja2Templates(directory="templates")
 
