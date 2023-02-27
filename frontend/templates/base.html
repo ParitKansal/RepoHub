@@ -19,14 +19,15 @@
                 extend: {
                     colors: {
                         github: {
-                            dark: '#0d1117',
-                            darker: '#010409',
-                            border: '#30363d',
-                            header: '#161b22',
-                            text: '#c9d1d9',
-                            blue: '#58a6ff',
-                            green: '#2ea043',
-                            red: '#da3633'
+                            dark:    '#080f1e',
+                            darker:  '#040810',
+                            border:  '#1a3a6b',
+                            header:  '#0d1b38',
+                            text:    '#cdd9f0',
+                            blue:    '#1d6fe8',
+                            lblue:   '#5a9cf5',
+                            green:   '#2ea043',
+                            red:     '#da3633'
                         }
                     }
                 }
@@ -35,51 +36,57 @@
     </script>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        ::selection { background: #1d6fe8; color: #fff; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #080f1e; }
+        ::-webkit-scrollbar-thumb { background: #1d6fe8; border-radius: 3px; }
+    </style>
 </head>
-<body class="bg-github-dark text-github-text min-h-screen font-sans antialiased">
-    
+<body class="bg-github-dark text-github-text min-h-screen font-sans antialiased flex flex-col">
+
     <!-- Top Navigation Bar -->
     <nav class="bg-github-header border-b border-github-border text-white px-6 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-4">
-            <a href="/" class="text-white hover:text-gray-300 flex items-center space-x-2">
-                <img src="/static/image.png" alt="GitClone" class="w-8 h-8 logo-img">
+            <a href="/" class="text-white hover:text-github-lblue flex items-center space-x-2 transition-colors">
+                <img src="/static/image.png" alt="GitClone" class="w-8 h-8">
                 <span class="text-xl font-semibold tracking-tight">GitClone</span>
             </a>
-            
+
             {% if user %}
             <!-- Search Bar -->
             <div class="hidden md:flex ml-4">
                 <form action="/search" method="GET" class="relative">
-                    <input type="text" name="q" placeholder="Search or jump to..." class="bg-github-dark border border-github-border rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue w-64 placeholder-gray-500" required>
-                    <button type="submit" class="absolute right-2 top-1.5 text-xs text-gray-500 border border-gray-600 rounded px-1 hover:text-white hover:border-gray-400">↵</button>
+                    <input type="text" name="q" placeholder="Search or jump to..." class="bg-github-darker border border-github-border rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue w-64 placeholder-gray-500" required>
+                    <button type="submit" class="absolute right-2 top-1.5 text-xs text-gray-500 border border-github-border rounded px-1 hover:text-white hover:border-github-blue">↵</button>
                 </form>
             </div>
             {% endif %}
         </div>
-        
+
         <div class="flex items-center space-x-4 text-sm font-semibold">
             {% if user %}
-                <a href="/dashboard" class="hover:text-github-blue transition-colors">Dashboard</a>
+                <a href="/dashboard" class="hover:text-github-lblue transition-colors">Dashboard</a>
                 <div class="flex items-center space-x-2">
-                    <div class="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs text-white">
+                    <div class="w-6 h-6 rounded-full bg-github-blue flex items-center justify-center text-xs text-white font-bold">
                         {{ user.username[0]|upper }}
                     </div>
                     <span>{{ user.username }}</span>
                 </div>
-                <a href="/logout" class="text-gray-400 hover:text-white transition-colors"><i class="fa-solid fa-sign-out-alt"></i></a>
+                <a href="/logout" class="text-gray-400 hover:text-github-lblue transition-colors"><i class="fa-solid fa-sign-out-alt"></i></a>
             {% else %}
-                <a href="/login" class="hover:text-white text-gray-300 transition-colors">Sign in</a>
-                <a href="/register" class="border border-gray-500 hover:border-white text-gray-300 hover:text-white rounded-md px-3 py-1 transition-colors">Sign up</a>
+                <a href="/login" class="hover:text-github-lblue text-gray-300 transition-colors">Sign in</a>
+                <a href="/register" class="border border-github-blue hover:bg-github-blue text-github-lblue hover:text-white rounded-md px-3 py-1 transition-colors">Sign up</a>
             {% endif %}
         </div>
     </nav>
 
     <!-- Main Content Area -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
         {% block content %}
         {% endblock %}
     </main>
-    
+
     <!-- Footer -->
     <footer class="border-t border-github-border mt-12 py-8 text-center text-xs text-gray-500">
         <p>&copy; 2026 GitClone Inc. All rights reserved.</p>
