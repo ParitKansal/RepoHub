@@ -1,4 +1,5 @@
 import os
+import asyncio
 import subprocess
 from fastapi import APIRouter, Request, Depends, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -57,15 +58,15 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
     branches = []
     diff_files = []
 
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not await git_utils.is_repo_empty(repo_path):
+        branches = await git_utils.get_branches(repo_path)
         if not compare and len(branches) > 1:
             compare = branches[1] if branches[1] != base else branches[0]
         elif not compare:
             compare = base
 
         if base in branches and compare in branches and base != compare:
-            diff_files = git_utils.get_branch_diff(repo_path, base, compare)
+            diff_files = await git_utils.get_branch_diff(repo_path, base, compare)
 
     return templates.TemplateResponse(request=request, name="new_pull.html", context={
         "user": current_user,
@@ -142,18 +143,20 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
     diff_files = []
     can_merge = False
 
-    if not git_utils.is_repo_empty(repo_path):
-        diff_files = git_utils.get_branch_diff(repo_path, pr.target_branch, pr.source_branch)
+    if not await git_utils.is_repo_empty(repo_path):
+        diff_files = await git_utils.get_branch_diff(repo_path, pr.target_branch, pr.source_branch)
         if pr.status == "Open":
             try:
-                mb = subprocess.run(
+                mb = await asyncio.to_thread(
+                    subprocess.run,
                     ["git", "merge-base", pr.target_branch, pr.source_branch],
-                    cwd=repo_path, capture_output=True, text=True
+                    cwd=repo_path, capture_output=True, text=True, timeout=30
                 )
                 if mb.returncode == 0:
-                    mt = subprocess.run(
+                    mt = await asyncio.to_thread(
+                        subprocess.run,
                         ["git", "merge-tree", mb.stdout.strip(), pr.target_branch, pr.source_branch],
-                        cwd=repo_path, capture_output=True
+                        cwd=repo_path, capture_output=True, timeout=30
                     )
                     can_merge = (mt.returncode == 0)
                 else:
@@ -195,7 +198,7 @@ async def pull_merge(request: Request, username: str, repo_name: str, pr_id: int
 
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
 
-    success = git_utils.merge_branches(
+    success = await git_utils.merge_branches(
         repo_path,
         pr.target_branch,
         pr.source_branch,

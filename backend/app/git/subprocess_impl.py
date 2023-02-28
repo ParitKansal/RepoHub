@@ -1,29 +1,52 @@
 import subprocess
 import os
+import asyncio
 
 
-def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
+def _run(*args, **kwargs):
+    kwargs.setdefault('timeout', 30)
+    return subprocess.run(*args, **kwargs)
+
+
+async def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
     user_dir = os.path.join(repos_dir, username)
     os.makedirs(user_dir, exist_ok=True)
     repo_path = os.path.join(user_dir, f"{repo_name}.git")
     try:
-        subprocess.run(
+        await asyncio.to_thread(
+            _run,
             ["git", "init", "--bare", repo_path],
             check=True,
             capture_output=True,
             text=True
         )
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error creating git repo: {e.stderr}")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        print(f"Error creating git repo: {e}")
         return False
 
 
-def get_branches(repo_path: str) -> list:
-    if is_repo_empty(repo_path):
+async def is_repo_empty(repo_path: str) -> bool:
+    try:
+        result = await asyncio.to_thread(
+            _run,
+            ["git", "rev-list", "-n", "1", "--all"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return len(result.stdout.strip()) == 0
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return True
+
+
+async def get_branches(repo_path: str) -> list:
+    if await is_repo_empty(repo_path):
         return []
     try:
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "branch", "--format=%(refname:short)"],
             cwd=repo_path,
             check=True,
@@ -34,29 +57,16 @@ def get_branches(repo_path: str) -> list:
         priority = {'main': 0, 'master': 1}
         branches.sort(key=lambda b: (priority.get(b, 2), b))
         return branches
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return []
 
 
-def is_repo_empty(repo_path: str) -> bool:
-    try:
-        result = subprocess.run(
-            ["git", "rev-list", "-n", "1", "--all"],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-            text=True
-        )
-        return len(result.stdout.strip()) == 0
-    except subprocess.CalledProcessError:
-        return True
-
-
-def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> list:
-    if is_repo_empty(repo_path):
+async def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> list:
+    if await is_repo_empty(repo_path):
         return []
     try:
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%an|%ar|%s"],
             cwd=repo_path,
             check=True,
@@ -75,7 +85,7 @@ def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> l
                         "message": parts[3]
                     })
         return commits
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return []
 
 
@@ -98,11 +108,12 @@ def parse_diff(diff_text: str) -> list:
     return files
 
 
-def get_commit_details(repo_path: str, commit_hash: str) -> dict:
+async def get_commit_details(repo_path: str, commit_hash: str) -> dict:
     if not os.path.exists(repo_path):
         return None
     try:
-        meta_result = subprocess.run(
+        meta_result = await asyncio.to_thread(
+            _run,
             ["git", "show", commit_hash, "-s", "--format=%an|%ad|%s"],
             cwd=repo_path,
             capture_output=True,
@@ -114,7 +125,8 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
             return None
         author, date, message = parts
 
-        diff_result = subprocess.run(
+        diff_result = await asyncio.to_thread(
+            _run,
             ["git", "show", commit_hash, "--pretty=format:", "--patch"],
             cwd=repo_path,
             capture_output=True,
@@ -130,15 +142,16 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
             "message": message,
             "diff_files": diff_files
         }
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
 
 
-def get_repo_files(repo_path: str, branch: str = "main") -> list:
-    if is_repo_empty(repo_path):
+async def get_repo_files(repo_path: str, branch: str = "main") -> list:
+    if await is_repo_empty(repo_path):
         return []
     try:
-        result_hash = subprocess.run(
+        result_hash = await asyncio.to_thread(
+            _run,
             ["git", "rev-parse", branch],
             cwd=repo_path,
             check=True,
@@ -147,7 +160,8 @@ def get_repo_files(repo_path: str, branch: str = "main") -> list:
         )
         latest_hash = result_hash.stdout.strip()
 
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "ls-tree", latest_hash],
             cwd=repo_path,
             check=True,
@@ -167,13 +181,14 @@ def get_repo_files(repo_path: str, branch: str = "main") -> list:
                     })
         files.sort(key=lambda x: (x["type"] != "tree", x["name"]))
         return files
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return []
 
 
-def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str:
+async def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str:
     try:
-        result_hash = subprocess.run(
+        result_hash = await asyncio.to_thread(
+            _run,
             ["git", "rev-parse", branch],
             cwd=repo_path,
             check=True,
@@ -182,7 +197,8 @@ def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str
         )
         latest_hash = result_hash.stdout.strip()
 
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "show", f"{latest_hash}:{filepath}"],
             cwd=repo_path,
             check=True,
@@ -190,15 +206,16 @@ def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str
             text=True
         )
         return result.stdout
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
 
 
-def get_contributors(repo_path: str) -> list:
-    if is_repo_empty(repo_path):
+async def get_contributors(repo_path: str) -> list:
+    if await is_repo_empty(repo_path):
         return []
     try:
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "shortlog", "-sn", "--all"],
             cwd=repo_path,
             check=True,
@@ -215,13 +232,14 @@ def get_contributors(repo_path: str) -> list:
                         "name": parts[1]
                     })
         return contributors
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return []
 
 
-def get_branch_diff(repo_path: str, target_branch: str, source_branch: str) -> list:
+async def get_branch_diff(repo_path: str, target_branch: str, source_branch: str) -> list:
     try:
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "diff", f"{target_branch}...{source_branch}", "--patch"],
             cwd=repo_path,
             check=True,
@@ -229,16 +247,16 @@ def get_branch_diff(repo_path: str, target_branch: str, source_branch: str) -> l
             text=True
         )
         return parse_diff(result.stdout)
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return []
 
 
-def get_commit_graph(repo_path: str, branch: str = "__all__", limit: int = 80) -> list:
-    if is_repo_empty(repo_path):
+async def get_commit_graph(repo_path: str, branch: str = "__all__", limit: int = 80) -> list:
+    if await is_repo_empty(repo_path):
         return []
     try:
         if branch == "__all__":
-            all_branches = get_branches(repo_path)
+            all_branches = await get_branches(repo_path)
             if "main" in all_branches:
                 ordered = ["main"] + [b for b in all_branches if b != "main"]
             elif "master" in all_branches:
@@ -249,7 +267,7 @@ def get_commit_graph(repo_path: str, branch: str = "__all__", limit: int = 80) -
         else:
             log_args = ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%P|%an|%ar|%s", "--topo-order"]
 
-        result = subprocess.run(log_args, cwd=repo_path, check=True, capture_output=True, text=True)
+        result = await asyncio.to_thread(_run, log_args, cwd=repo_path, check=True, capture_output=True, text=True)
         commits = []
         for line in result.stdout.strip().split('\n'):
             if not line:
@@ -268,15 +286,16 @@ def get_commit_graph(repo_path: str, branch: str = "__all__", limit: int = 80) -
                 "message": message
             })
         return commits
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return []
 
 
-def get_branch_tips(repo_path: str) -> dict:
-    if is_repo_empty(repo_path):
+async def get_branch_tips(repo_path: str) -> dict:
+    if await is_repo_empty(repo_path):
         return {}
     try:
-        result = subprocess.run(
+        result = await asyncio.to_thread(
+            _run,
             ["git", "show-ref", "--heads"],
             cwd=repo_path, check=True, capture_output=True, text=True
         )
@@ -287,23 +306,24 @@ def get_branch_tips(repo_path: str) -> dict:
                 name = ref.strip().replace('refs/heads/', '')
                 tips[name] = commit_hash.strip()
         return tips
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return {}
 
 
-def merge_branches(repo_path: str, target_branch: str, source_branch: str, author_name: str, author_email: str) -> bool:
+async def merge_branches(repo_path: str, target_branch: str, source_branch: str, author_name: str, author_email: str) -> bool:
     import tempfile
     import shutil
 
     temp_dir = tempfile.mkdtemp()
     abs_repo_path = os.path.abspath(repo_path)
     try:
-        subprocess.run(["git", "clone", abs_repo_path, "."], cwd=temp_dir, check=True, capture_output=True)
-        subprocess.run(["git", "config", "user.name", author_name], cwd=temp_dir, check=True)
-        subprocess.run(["git", "config", "user.email", author_email], cwd=temp_dir, check=True)
-        subprocess.run(["git", "checkout", target_branch], cwd=temp_dir, check=True, capture_output=True)
+        await asyncio.to_thread(_run, ["git", "clone", abs_repo_path, "."], cwd=temp_dir, check=True, capture_output=True)
+        await asyncio.to_thread(_run, ["git", "config", "user.name", author_name], cwd=temp_dir, check=True)
+        await asyncio.to_thread(_run, ["git", "config", "user.email", author_email], cwd=temp_dir, check=True)
+        await asyncio.to_thread(_run, ["git", "checkout", target_branch], cwd=temp_dir, check=True, capture_output=True)
 
-        merge_result = subprocess.run(
+        merge_result = await asyncio.to_thread(
+            _run,
             ["git", "merge", f"origin/{source_branch}", "--no-ff", "-m",
              f"Merge branch '{source_branch}' into {target_branch}"],
             cwd=temp_dir,
@@ -313,7 +333,7 @@ def merge_branches(repo_path: str, target_branch: str, source_branch: str, autho
         if merge_result.returncode != 0:
             return False
 
-        subprocess.run(["git", "push", "origin", target_branch], cwd=temp_dir, check=True, capture_output=True)
+        await asyncio.to_thread(_run, ["git", "push", "origin", target_branch], cwd=temp_dir, check=True, capture_output=True)
         return True
     except Exception as e:
         print(f"Merge error: {e}")

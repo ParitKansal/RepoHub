@@ -46,7 +46,7 @@ async def new_repo_post(
     if existing_repo:
         return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Repository already exists", "user": user})
 
-    success = git_utils.create_bare_repo(settings.repos_dir, user.username, repo_name)
+    success = await git_utils.create_bare_repo(settings.repos_dir, user.username, repo_name)
     if not success:
         return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Failed to create git repository on disk", "user": user})
 
@@ -75,7 +75,7 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
 
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
 
-    is_empty = git_utils.is_repo_empty(repo_path)
+    is_empty = await git_utils.is_repo_empty(repo_path)
     files = []
     latest_commit = None
     readme_html = None
@@ -83,25 +83,25 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
     contributors = []
 
     if not is_empty:
-        branches = git_utils.get_branches(repo_path)
+        branches = await git_utils.get_branches(repo_path)
         if branch not in branches and branches:
             branch = branches[0]
 
-        files = git_utils.get_repo_files(repo_path, branch=branch)
-        commits = git_utils.get_repo_commits(repo_path, limit=1, branch=branch)
+        files = await git_utils.get_repo_files(repo_path, branch=branch)
+        commits = await git_utils.get_repo_commits(repo_path, limit=1, branch=branch)
         if commits:
             latest_commit = commits[0]
 
         for file in files:
             if file['name'].lower() == 'readme.md' and file['type'] == 'blob':
                 try:
-                    readme_content = git_utils.get_file_content(repo_path, file['name'], branch=branch)
+                    readme_content = await git_utils.get_file_content(repo_path, file['name'], branch=branch)
                     if readme_content:
                         readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
                 except Exception:
                     pass
 
-        contributors = git_utils.get_contributors(repo_path)
+        contributors = await git_utils.get_contributors(repo_path)
 
     return templates.TemplateResponse(request=request, name="repo_detail.html", context={
         "user": current_user,

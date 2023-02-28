@@ -30,11 +30,11 @@ async def repo_commits(request: Request, username: str, repo_name: str, branch: 
     commits = []
     branches = []
 
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not await git_utils.is_repo_empty(repo_path):
+        branches = await git_utils.get_branches(repo_path)
         if branch not in branches and branches:
             branch = branches[0]
-        commits = git_utils.get_repo_commits(repo_path, limit=50, branch=branch)
+        commits = await git_utils.get_repo_commits(repo_path, limit=50, branch=branch)
 
     return templates.TemplateResponse(request=request, name="commits.html", context={
         "user": current_user,
@@ -64,8 +64,8 @@ async def repo_branches(request: Request, username: str, repo_name: str, db: Ses
 
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
     branches = []
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not await git_utils.is_repo_empty(repo_path):
+        branches = await git_utils.get_branches(repo_path)
 
     return templates.TemplateResponse(request=request, name="branches.html", context={
         "user": current_user,
@@ -93,11 +93,11 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
 
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
 
-    branches = git_utils.get_branches(repo_path)
+    branches = await git_utils.get_branches(repo_path)
     if branch not in branches and branches:
         branch = branches[0]
 
-    content = git_utils.get_file_content(repo_path, filepath, branch=branch)
+    content = await git_utils.get_file_content(repo_path, filepath, branch=branch)
 
     return templates.TemplateResponse(request=request, name="file_view.html", context={
         "user": current_user,
@@ -124,7 +124,7 @@ async def commit_detail(request: Request, username: str, repo_name: str, commit_
         return RedirectResponse(url="/", status_code=303)
 
     repo_path = os.path.join(settings.repos_dir, username, repo_name + ".git")
-    commit_data = git_utils.get_commit_details(repo_path, commit_hash)
+    commit_data = await git_utils.get_commit_details(repo_path, commit_hash)
 
     if not commit_data:
         return RedirectResponse(url=f"/{username}/{repo_name}/commits")

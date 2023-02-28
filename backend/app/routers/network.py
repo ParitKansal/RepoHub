@@ -28,8 +28,8 @@ async def repo_network(request: Request, username: str, repo_name: str, branch: 
 
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
     branches = []
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not await git_utils.is_repo_empty(repo_path):
+        branches = await git_utils.get_branches(repo_path)
 
     return templates.TemplateResponse(request=request, name="network.html", context={
         "user": current_user,
@@ -57,9 +57,9 @@ async def repo_graph_data(request: Request, username: str, repo_name: str, branc
         return JSONResponse({"error": "Repository not found"}, status_code=404)
 
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
-    if git_utils.is_repo_empty(repo_path):
+    if await git_utils.is_repo_empty(repo_path):
         return JSONResponse({"commits": [], "branch_tips": {}})
 
-    commits = git_utils.get_commit_graph(repo_path, branch, limit=80)
-    branch_tips = git_utils.get_branch_tips(repo_path)
+    commits = await git_utils.get_commit_graph(repo_path, branch, limit=80)
+    branch_tips = await git_utils.get_branch_tips(repo_path)
     return JSONResponse({"commits": commits, "branch_tips": branch_tips})
