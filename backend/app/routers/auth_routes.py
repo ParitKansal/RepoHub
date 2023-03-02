@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Request, Depends, Form, status, Response
+from fastapi import APIRouter, Request, Depends, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from .. import models, auth
-from ..deps import templates, get_db
+from ..deps import templates, get_db, limiter
 
 router = APIRouter()
 
@@ -21,9 +21,9 @@ async def login_get(request: Request):
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login_post(
     request: Request,
-    response: Response,
     username: str = Form(...),
     password: str = Form(...),
     db: Session = Depends(get_db)
