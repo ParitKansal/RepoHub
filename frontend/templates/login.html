@@ -15,6 +15,7 @@
         {% endif %}
         
         <form action="/login" method="POST" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
             <div>
                 <label for="username" class="block text-sm font-medium text-white mb-1">Username or email address</label>
                 <input type="text" id="username" name="username" required class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1.5 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue">

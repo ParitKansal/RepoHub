@@ -34,7 +34,7 @@ async def login_post(
 
     access_token = auth.create_access_token(data={"sub": user.username})
     redirect = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
-    redirect.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    redirect.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, secure=True, samesite="lax")
     return redirect
 
 

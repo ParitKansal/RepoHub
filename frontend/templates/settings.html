@@ -17,6 +17,7 @@
                 </div>
                 <div>
                     <form action="/{{ owner.username }}/{{ repo.name }}/delete" method="POST" onsubmit="return confirm('Are you ABSOLUTELY sure you want to delete this repository? This action cannot be undone.');">
+            <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
                         <button type="submit" class="bg-github-dark hover:bg-red-900 border border-red-900 text-red-500 hover:text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors">
                             Delete repository
                         </button>

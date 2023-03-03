@@ -70,6 +70,7 @@
                         
                         <div class="flex items-center space-x-2">
                             <form action="/{{ user.username }}/{{ repo.name }}/star" method="POST" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
                                 <button type="submit" class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 px-3 py-1 rounded-md text-xs font-semibold flex items-center transition-colors">
                                     {% set starred = namespace(value=false) %}
                                     {% for s in repo.stars %}

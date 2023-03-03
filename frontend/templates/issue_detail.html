@@ -105,6 +105,7 @@
                 </div>
                 <div class="flex-1">
                     <form action="/{{ owner.username }}/{{ repo.name }}/issues/{{ issue.id }}/comment" method="POST" class="border border-github-border rounded-lg p-2 bg-github-header">
+            <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
                         <textarea name="content" rows="3" placeholder="Leave a comment" class="w-full bg-github-dark border border-github-border rounded-md px-3 py-2 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-500 text-sm resize-y" required></textarea>
                         <div class="flex justify-end mt-2 space-x-2">
                             <button type="submit" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1.5 px-3 rounded-md text-sm">Comment</button>
@@ -112,6 +113,7 @@
                     </form>
 
                     <form action="/{{ owner.username }}/{{ repo.name }}/issues/{{ issue.id }}/close" method="POST" class="mt-4 flex justify-end">
+            <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
                         {% if issue.status == 'Open' %}
                         <button type="submit" class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 font-semibold py-1.5 px-3 rounded-md text-sm flex items-center">
                             <i class="fa-regular fa-circle-check text-purple-500 mr-2"></i> Close issue

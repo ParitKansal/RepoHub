@@ -1,6 +1,10 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
-import datetime
+from datetime import datetime, timezone
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 from .database import Base
 
 
@@ -50,7 +54,7 @@ class Comment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     issue_id = Column(Integer, ForeignKey("issues.id"))
     author_id = Column(Integer, ForeignKey("users.id"))
@@ -65,7 +69,7 @@ class Star(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     repo_id = Column(Integer, ForeignKey("repositories.id"))
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     user = relationship("User")
     repository = relationship("Repository", back_populates="stars")
@@ -80,7 +84,7 @@ class PullRequest(Base):
     status = Column(String, default="Open")  # Open, Merged, Closed
     source_branch = Column(String)
     target_branch = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow)
 
     repo_id = Column(Integer, ForeignKey("repositories.id"))
     author_id = Column(Integer, ForeignKey("users.id"))

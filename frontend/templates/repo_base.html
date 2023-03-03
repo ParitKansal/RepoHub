@@ -17,6 +17,7 @@
 
         {% if user %}
         <form action="/{{ owner.username }}/{{ repo.name }}/star" method="POST" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
             <button type="submit" class="border border-github-border bg-github-darker hover:bg-github-header text-sm font-semibold rounded-md px-3 py-1 transition-colors flex items-center">
                 {% set starred = namespace(value=false) %}
                 {% for s in repo.stars %}
