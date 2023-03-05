@@ -7,8 +7,11 @@ from ..deps import templates, get_db
 router = APIRouter()
 
 
+PAGE_SIZE = 25
+
+
 @router.get("/{username}/{repo_name}/issues", response_class=HTMLResponse)
-async def repo_issues(request: Request, username: str, repo_name: str, state: str = "open", db: Session = Depends(get_db)):
+async def repo_issues(request: Request, username: str, repo_name: str, state: str = "open", page: int = 1, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
         return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
@@ -29,10 +32,15 @@ async def repo_issues(request: Request, username: str, repo_name: str, state: st
     query = db.query(models.Issue).filter(models.Issue.repo_id == repo.id)
     if state.lower() == "closed":
         query = query.filter(models.Issue.status == "Closed")
+        total = closed_count
     else:
         query = query.filter(models.Issue.status == "Open")
+        total = open_count
 
-    issues = query.all()
+    page = max(1, page)
+    offset = (page - 1) * PAGE_SIZE
+    issues = query.order_by(models.Issue.id.desc()).offset(offset).limit(PAGE_SIZE).all()
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
 
     return templates.TemplateResponse(request=request, name="issues.html", context={
         "user": current_user,
@@ -41,7 +49,9 @@ async def repo_issues(request: Request, username: str, repo_name: str, state: st
         "issues": issues,
         "state": state.lower(),
         "open_count": open_count,
-        "closed_count": closed_count
+        "closed_count": closed_count,
+        "page": page,
+        "total_pages": total_pages,
     })
 
 

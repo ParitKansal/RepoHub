@@ -1,14 +1,38 @@
 import os
-from fastapi import FastAPI
+import logging
+import json
+import time
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text as sql_text
 from . import models, database
 from .config import settings
 from .csrf import CSRFMiddleware
 from .deps import limiter
 from .routers import auth_routes, users, repos, code, issues, pulls, network
+
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps({
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "path": getattr(record, "path", None),
+            "status": getattr(record, "status", None),
+            "duration_ms": getattr(record, "duration_ms", None),
+        })
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_JsonFormatter())
+logging.basicConfig(handlers=[_handler], level=logging.INFO, force=True)
+
+logger = logging.getLogger(__name__)
 
 os.makedirs(settings.repos_dir, exist_ok=True)
 models.Base.metadata.create_all(bind=database.engine)
@@ -25,6 +49,35 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    duration_ms = round((time.monotonic() - start) * 1000, 1)
+    logger.info(
+        "%s %s %s",
+        request.method,
+        request.url.path,
+        response.status_code,
+        extra={"path": request.url.path, "status": response.status_code, "duration_ms": duration_ms},
+    )
+    return response
+
+
+@app.get("/health")
+async def health():
+    try:
+        db = database.SessionLocal()
+        db.execute(sql_text("SELECT 1"))
+        db.close()
+        db_ok = True
+    except Exception:
+        db_ok = False
+    status = "ok" if db_ok else "degraded"
+    return JSONResponse({"status": status, "db": db_ok}, status_code=200 if db_ok else 503)
+
 
 app.mount("/static", StaticFiles(directory="/app/frontend/static"), name="static")
 

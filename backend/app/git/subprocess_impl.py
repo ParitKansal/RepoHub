@@ -61,13 +61,13 @@ async def get_branches(repo_path: str) -> list:
         return []
 
 
-async def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> list:
+async def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main", skip: int = 0) -> list:
     if await is_repo_empty(repo_path):
         return []
     try:
         result = await asyncio.to_thread(
             _run,
-            ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%an|%ar|%s"],
+            ["git", "log", branch, f"--skip={skip}", "-n", str(limit), "--pretty=format:%H|%an|%ar|%s"],
             cwd=repo_path,
             check=True,
             capture_output=True,

@@ -10,8 +10,11 @@ from ..config import settings
 router = APIRouter()
 
 
+COMMITS_PER_PAGE = 50
+
+
 @router.get("/{username}/{repo_name}/commits", response_class=HTMLResponse)
-async def repo_commits(request: Request, username: str, repo_name: str, branch: str = "main", db: Session = Depends(get_db)):
+async def repo_commits(request: Request, username: str, repo_name: str, branch: str = "main", page: int = 1, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
     if not owner:
         return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
@@ -30,11 +33,12 @@ async def repo_commits(request: Request, username: str, repo_name: str, branch: 
     commits = []
     branches = []
 
+    page = max(1, page)
     if not await git_utils.is_repo_empty(repo_path):
         branches = await git_utils.get_branches(repo_path)
         if branch not in branches and branches:
             branch = branches[0]
-        commits = await git_utils.get_repo_commits(repo_path, limit=50, branch=branch)
+        commits = await git_utils.get_repo_commits(repo_path, limit=COMMITS_PER_PAGE, branch=branch, skip=(page - 1) * COMMITS_PER_PAGE)
 
     return templates.TemplateResponse(request=request, name="commits.html", context={
         "user": current_user,
@@ -42,7 +46,9 @@ async def repo_commits(request: Request, username: str, repo_name: str, branch: 
         "owner": owner,
         "commits": commits,
         "branches": branches,
-        "current_branch": branch
+        "current_branch": branch,
+        "page": page,
+        "has_next": len(commits) == COMMITS_PER_PAGE,
     })
 
 
