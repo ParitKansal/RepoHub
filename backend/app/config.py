@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
     cors_origins: List[str] = []
+    sentry_dsn: str = ""
 
     class Config:
         env_file = ".env"

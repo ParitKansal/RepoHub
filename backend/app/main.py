@@ -34,6 +34,16 @@ logging.basicConfig(handlers=[_handler], level=logging.INFO, force=True)
 
 logger = logging.getLogger(__name__)
 
+if settings.sentry_dsn:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+        traces_sample_rate=0.2,
+    )
+
 os.makedirs(settings.repos_dir, exist_ok=True)
 models.Base.metadata.create_all(bind=database.engine)
 
