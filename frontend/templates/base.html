@@ -11,29 +11,36 @@
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:image" content="/static/image.png">
-    <!-- Tailwind CSS via CDN -->
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        github: {
-                            dark:    '#080f1e',
-                            darker:  '#040810',
-                            border:  '#1a3a6b',
-                            header:  '#0d1b38',
-                            text:    '#cdd9f0',
-                            blue:    '#1d6fe8',
-                            lblue:   '#5a9cf5',
-                            green:   '#2ea043',
-                            red:     '#da3633'
-                        }
-                    }
-                }
-            }
+    <!-- Tailwind CSS via CDN (Standard CSS) -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --github-dark: #080f1e;
+            --github-darker: #040810;
+            --github-border: #1a3a6b;
+            --github-header: #0d1b38;
+            --github-text: #cdd9f0;
+            --github-blue: #1d6fe8;
+            --github-lblue: #5a9cf5;
+            --github-green: #2ea043;
+            --github-red: #da3633;
         }
-    </script>
+        .bg-github-dark { background-color: var(--github-dark); }
+        .bg-github-darker { background-color: var(--github-darker); }
+        .bg-github-header { background-color: var(--github-header); }
+        .text-github-text { color: var(--github-text); }
+        .text-github-blue { color: var(--github-blue); }
+        .text-github-lblue { color: var(--github-lblue); }
+        .text-github-green { color: var(--github-green); }
+        .text-github-red { color: var(--github-red); }
+        .border-github-border { border-color: var(--github-border); }
+        .hover\:bg-github-border:hover { background-color: var(--github-border); }
+        .hover\:text-github-blue:hover { color: var(--github-blue); }
+        .focus\:border-github-blue:focus { border-color: var(--github-blue); }
+        .bg-github-blue { background-color: var(--github-blue); }
+        .bg-github-green { background-color: var(--github-green); }
+        .bg-github-red { background-color: var(--github-red); }
+    </style>
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
