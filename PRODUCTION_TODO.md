@@ -99,8 +99,8 @@ Ordered by priority — fix the top ones first.
 
 ## 🟢 Nice to Have (polish)
 
-- [ ] **Tailwind CSS loaded from CDN**
-  Templates will break offline or on slow networks; CDN outage = broken UI.
+- [/] **Tailwind CSS loaded from CDN**
+  *Switched from dynamic JS compiler to a standard CSS CDN link, but still loaded from the internet.*
   Fix: bundle Tailwind with `npx tailwindcss` build step into `frontend/static/`.
 
 - [x] **No error monitoring**
@@ -115,7 +115,7 @@ Ordered by priority — fix the top ones first.
   Build context includes compiled bytecache.
   Fix: add `**/__pycache__` and `**/*.pyc` to `.dockerignore`.
 
-- [ ] **`repos/` directory has no size limits**
+- [x] **`repos/` directory has no size limits**
   A user could push a multi-GB repo and fill the disk.
   Fix: add disk quota checks before `create_bare_repo`; set git push size limits via
   git hooks (`pre-receive`).

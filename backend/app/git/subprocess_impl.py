@@ -1,6 +1,7 @@
 import subprocess
 import os
 import asyncio
+import shutil
 
 
 def _run(*args, **kwargs):
@@ -8,7 +9,22 @@ def _run(*args, **kwargs):
     return subprocess.run(*args, **kwargs)
 
 
+def _write_hook(hook_path: str, content: str):
+    with open(hook_path, "w") as f:
+        f.write(content)
+    os.chmod(hook_path, 0o755)
+
+
 async def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
+    # 1. Disk Quota Check (require at least 1GB free space)
+    try:
+        total, used, free = shutil.disk_usage(repos_dir)
+        if free < 1024 * 1024 * 1024:  # 1 GB in bytes
+            print(f"Error: Insufficient disk space on {repos_dir} (Free: {free / (1024**3):.2f} GB)")
+            return False
+    except Exception as e:
+        print(f"Warning: Could not check disk space: {e}")
+
     user_dir = os.path.join(repos_dir, username)
     os.makedirs(user_dir, exist_ok=True)
     repo_path = os.path.join(user_dir, f"{repo_name}.git")
@@ -20,9 +36,33 @@ async def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> boo
             capture_output=True,
             text=True
         )
+
+        # 2. Setup pre-receive hook to enforce a 100MB repository size limit
+        hooks_dir = os.path.join(repo_path, "hooks")
+        os.makedirs(hooks_dir, exist_ok=True)
+        hook_path = os.path.join(hooks_dir, "pre-receive")
+        
+        hook_content = """#!/bin/bash
+# Enforce repository size limit of 100MB
+MAX_SIZE_KB=102400
+CURRENT_SIZE_KB=$(du -sk . | cut -f1)
+
+if [ "$CURRENT_SIZE_KB" -gt "$MAX_SIZE_KB" ]; then
+    echo "======================================================="
+    echo "ERROR: Push rejected!"
+    echo "Repository size limit of 100MB exceeded."
+    echo "Current size: $((CURRENT_SIZE_KB / 1024))MB."
+    echo "======================================================="
+    exit 1
+fi
+"""
+        await asyncio.to_thread(_write_hook, hook_path, hook_content)
         return True
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
         print(f"Error creating git repo: {e}")
+        return False
+    except Exception as e:
+        print(f"Error setting up git hooks: {e}")
         return False
 
 

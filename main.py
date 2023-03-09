@@ -235,7 +235,7 @@ async def new_repo_post(
     # Create physically on disk
     success = git_utils.create_bare_repo(REPOS_DIR, user.username, repo_name)
     if not success:
-        return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Failed to create git repository on disk", "user": user})
+        return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Failed to create git repository on disk (insufficient disk space or internal error)", "user": user})
 
     # Save to database
     new_repo = models.Repository(name=repo_name, description=description, is_private=is_private, owner_id=user.id)
