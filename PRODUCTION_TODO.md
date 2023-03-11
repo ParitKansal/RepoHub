@@ -83,7 +83,7 @@ Ordered by priority — fix the top ones first.
   Fix (long term): store bare repos on a network volume (NFS, EFS) or use object storage
   with a git-over-HTTP layer.
 
-- [ ] **No nginx / reverse proxy in front of uvicorn**
+- [x] **No nginx / reverse proxy in front of uvicorn**
   Uvicorn is an ASGI server, not designed to face the internet directly.
   Fix: add an nginx container in `docker-compose.yml` to handle TLS, compression, and
   static files.
