@@ -88,7 +88,7 @@ Ordered by priority — fix the top ones first.
   Fix: add an nginx container in `docker-compose.yml` to handle TLS, compression, and
   static files.
 
-- [ ] **No TLS / HTTPS**
+- [x] **No TLS / HTTPS**
   All cookies and tokens travel in plaintext.
   Fix: terminate TLS at nginx using Let's Encrypt (certbot) or a cloud load balancer.
 
