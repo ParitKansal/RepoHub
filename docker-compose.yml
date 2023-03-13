@@ -16,7 +16,7 @@ services:
   web:
     build: ./backend
     volumes:
-      - ./repos:/repos
+      - repos-data:/repos
       - ./frontend:/app/frontend
     environment:
       - PYTHONUNBUFFERED=1
@@ -43,3 +43,4 @@ services:
 
 volumes:
   pgdata:
+  repos-data:

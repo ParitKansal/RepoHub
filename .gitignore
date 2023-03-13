@@ -48,3 +48,6 @@ PRODUCTION_TODO.md
 
 # Nginx SSL Certificates
 nginx/certs/
+
+# Local Backups
+backups/

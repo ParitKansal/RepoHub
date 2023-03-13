@@ -77,7 +77,7 @@ Ordered by priority — fix the top ones first.
   A repo with 10,000 issues would return everything in one query.
   Fix: add `limit` + `offset` (or cursor-based) pagination to issues, pulls, search.
 
-- [ ] **Repos stored on local disk only**
+- [x] **Repos stored on local disk only**
   Not horizontally scalable — a second server instance won't see the repos.
   No backup strategy either.
   Fix (long term): store bare repos on a network volume (NFS, EFS) or use object storage
