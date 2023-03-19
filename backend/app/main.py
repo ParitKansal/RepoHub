@@ -13,7 +13,7 @@ from . import models, database
 from .config import settings
 from .csrf import CSRFMiddleware
 from .deps import limiter
-from .routers import auth_routes, users, repos, code, issues, pulls, network
+from .routers import auth_routes, users, repos, code, issues, pulls, network, git_http
 
 
 class _JsonFormatter(logging.Formatter):
@@ -98,3 +98,4 @@ app.include_router(issues.router)
 app.include_router(pulls.router)
 app.include_router(network.router)
 app.include_router(users.router)
+app.include_router(git_http.router)
