@@ -19,7 +19,8 @@ class CSRFMiddleware:
         request = Request(scope, receive)
         
         # We only validate POST requests that are not exempt
-        if request.method == "POST" and request.url.path not in EXEMPT_PATHS:
+        is_exempt = request.url.path in EXEMPT_PATHS or ".git/" in request.url.path
+        if request.method == "POST" and not is_exempt:
             # Read the body and create a replayed receive channel so downstream handlers can read it again
             body = await request.body()
             
