@@ -47,6 +47,7 @@ async def run_git_http_backend(request: Request, username: str, repo_name: str, 
         "REQUEST_METHOD": request.method,
         "QUERY_STRING": request.url.query,
         "CONTENT_TYPE": request.headers.get("Content-Type", ""),
+        "GIT_CONFIG_PARAMETERS": "'http.receivepack=true'",
     }
 
     # Start the git http-backend process
