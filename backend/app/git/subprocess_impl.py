@@ -357,10 +357,18 @@ async def merge_branches(repo_path: str, target_branch: str, source_branch: str,
     temp_dir = tempfile.mkdtemp()
     abs_repo_path = os.path.abspath(repo_path)
     try:
-        await asyncio.to_thread(_run, ["git", "clone", abs_repo_path, "."], cwd=temp_dir, check=True, capture_output=True)
+        clone_res = await asyncio.to_thread(_run, ["git", "clone", abs_repo_path, "."], cwd=temp_dir, capture_output=True, text=True)
+        if clone_res.returncode != 0:
+            print(f"Merge error (clone failed): {clone_res.stderr}")
+            return False
+
         await asyncio.to_thread(_run, ["git", "config", "user.name", author_name], cwd=temp_dir, check=True)
         await asyncio.to_thread(_run, ["git", "config", "user.email", author_email], cwd=temp_dir, check=True)
-        await asyncio.to_thread(_run, ["git", "checkout", target_branch], cwd=temp_dir, check=True, capture_output=True)
+
+        checkout_res = await asyncio.to_thread(_run, ["git", "checkout", target_branch], cwd=temp_dir, capture_output=True, text=True)
+        if checkout_res.returncode != 0:
+            print(f"Merge error (checkout failed): {checkout_res.stderr}")
+            return False
 
         merge_result = await asyncio.to_thread(
             _run,
@@ -371,12 +379,17 @@ async def merge_branches(repo_path: str, target_branch: str, source_branch: str,
             text=True
         )
         if merge_result.returncode != 0:
+            print(f"Merge error (merge failed): {merge_result.stderr}\nStdout: {merge_result.stdout}")
             return False
 
-        await asyncio.to_thread(_run, ["git", "push", "origin", target_branch], cwd=temp_dir, check=True, capture_output=True)
+        push_res = await asyncio.to_thread(_run, ["git", "push", "origin", target_branch], cwd=temp_dir, capture_output=True, text=True)
+        if push_res.returncode != 0:
+            print(f"Merge error (push failed): {push_res.stderr}")
+            return False
+
         return True
     except Exception as e:
-        print(f"Merge error: {e}")
+        print(f"Merge error (exception): {e}")
         return False
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
