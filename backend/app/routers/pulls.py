@@ -147,20 +147,13 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
         diff_files = await git_utils.get_branch_diff(repo_path, pr.target_branch, pr.source_branch)
         if pr.status == "Open":
             try:
-                mb = await asyncio.to_thread(
+                # Modern git merge-tree check: returns 0 if clean, 1 if there are conflicts.
+                mt = await asyncio.to_thread(
                     subprocess.run,
-                    ["git", "merge-base", pr.target_branch, pr.source_branch],
-                    cwd=repo_path, capture_output=True, text=True, timeout=30
+                    ["git", "merge-tree", "--write-tree", pr.target_branch, pr.source_branch],
+                    cwd=repo_path, capture_output=True, timeout=30
                 )
-                if mb.returncode == 0:
-                    mt = await asyncio.to_thread(
-                        subprocess.run,
-                        ["git", "merge-tree", mb.stdout.strip(), pr.target_branch, pr.source_branch],
-                        cwd=repo_path, capture_output=True, timeout=30
-                    )
-                    can_merge = (mt.returncode == 0)
-                else:
-                    can_merge = False
+                can_merge = (mt.returncode == 0)
             except Exception:
                 can_merge = True
 
