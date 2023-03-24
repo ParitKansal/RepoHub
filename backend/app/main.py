@@ -12,7 +12,9 @@ from sqlalchemy import text as sql_text
 from . import models, database
 from .config import settings
 from .csrf import CSRFMiddleware
-from .deps import limiter
+from .deps import limiter, templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.responses import HTMLResponse
 from .routers import auth_routes, users, repos, code, issues, pulls, network, git_http
 
 
@@ -50,6 +52,28 @@ models.Base.metadata.create_all(bind=database.engine)
 app = FastAPI(title="GitClone")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Try to get current user from cookie to show in header
+    from . import auth
+    from .database import SessionLocal
+    db = SessionLocal()
+    current_user = None
+    try:
+        current_user = auth.get_current_user_from_cookie(request, db)
+    except Exception:
+        pass
+    finally:
+        db.close()
+
+    error_msg = "Page Not Found" if exc.status_code == 404 else exc.detail
+    return templates.TemplateResponse(
+        request=request,
+        name="error.html",
+        context={"error": f"{exc.status_code}: {error_msg}", "user": current_user},
+        status_code=exc.status_code
+    )
 
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(
