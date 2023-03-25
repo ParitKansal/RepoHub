@@ -142,6 +142,7 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
     diff_files = []
     can_merge = False
+    conflicting_files = []
 
     if not await git_utils.is_repo_empty(repo_path):
         diff_files = await git_utils.get_branch_diff(repo_path, pr.target_branch, pr.source_branch)
@@ -154,6 +155,27 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
                     cwd=repo_path, capture_output=True, timeout=30
                 )
                 can_merge = (mt.returncode == 0)
+
+                if not can_merge:
+                    # Parse conflicting files using old merge-tree
+                    mb = await asyncio.to_thread(
+                        subprocess.run,
+                        ["git", "merge-base", pr.target_branch, pr.source_branch],
+                        cwd=repo_path, capture_output=True, text=True, timeout=10
+                    )
+                    if mb.returncode == 0:
+                        mt_old = await asyncio.to_thread(
+                            subprocess.run,
+                            ["git", "merge-tree", mb.stdout.strip(), pr.target_branch, pr.source_branch],
+                            cwd=repo_path, capture_output=True, text=True, timeout=10
+                        )
+                        for line in mt_old.stdout.splitlines():
+                            if line.strip().startswith("our "):
+                                parts = line.strip().split()
+                                if len(parts) >= 4:
+                                    filename = parts[-1]
+                                    if filename not in conflicting_files:
+                                        conflicting_files.append(filename)
             except Exception:
                 can_merge = True
 
@@ -163,7 +185,8 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
         "owner": owner,
         "pr": pr,
         "diff_files": diff_files,
-        "can_merge": can_merge
+        "can_merge": can_merge,
+        "conflicting_files": conflicting_files
     })
 
 
