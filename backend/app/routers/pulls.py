@@ -152,30 +152,19 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
                 mt = await asyncio.to_thread(
                     subprocess.run,
                     ["git", "merge-tree", "--write-tree", pr.target_branch, pr.source_branch],
-                    cwd=repo_path, capture_output=True, timeout=30
+                    cwd=repo_path, capture_output=True, text=True, timeout=30
                 )
                 can_merge = (mt.returncode == 0)
 
-                if not can_merge:
-                    # Parse conflicting files using old merge-tree
-                    mb = await asyncio.to_thread(
-                        subprocess.run,
-                        ["git", "merge-base", pr.target_branch, pr.source_branch],
-                        cwd=repo_path, capture_output=True, text=True, timeout=10
-                    )
-                    if mb.returncode == 0:
-                        mt_old = await asyncio.to_thread(
-                            subprocess.run,
-                            ["git", "merge-tree", mb.stdout.strip(), pr.target_branch, pr.source_branch],
-                            cwd=repo_path, capture_output=True, text=True, timeout=10
-                        )
-                        for line in mt_old.stdout.splitlines():
-                            if line.strip().startswith("our "):
-                                parts = line.strip().split()
-                                if len(parts) >= 4:
-                                    filename = parts[-1]
-                                    if filename not in conflicting_files:
-                                        conflicting_files.append(filename)
+                if not can_merge and mt.stdout:
+                    for line in mt.stdout.splitlines():
+                        if not line.strip():
+                            break
+                        parts = line.split("\t")
+                        if len(parts) == 2:
+                            filename = parts[1].strip()
+                            if filename not in conflicting_files:
+                                conflicting_files.append(filename)
             except Exception:
                 can_merge = True
 
