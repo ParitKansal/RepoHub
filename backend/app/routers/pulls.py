@@ -168,6 +168,7 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
             except Exception:
                 can_merge = True
 
+    print(f"DEBUG: pr_id={pr_id}, can_merge={can_merge}, conflicting_files={conflicting_files}")
     return templates.TemplateResponse(request=request, name="pull_detail.html", context={
         "user": current_user,
         "repo": repo,
