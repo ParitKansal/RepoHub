@@ -1,8 +1,8 @@
 import os
 import asyncio
 import subprocess
-from fastapi import APIRouter, Request, Depends, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Request, Depends, Form, status, Query
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from sqlalchemy.orm import Session
 from .. import models, auth
 from ..deps import templates, get_db
@@ -10,6 +10,55 @@ from ..git import subprocess_impl as git_utils
 from ..config import settings
 
 router = APIRouter()
+
+
+@router.get("/{username}/{repo_name}/api/check-conflicts")
+async def check_conflicts(
+    request: Request,
+    username: str,
+    repo_name: str,
+    base: str = Query(...),
+    compare: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id,
+        models.Repository.name == repo_name
+    ).first() if owner else None
+
+    current_user = auth.get_current_user_from_cookie(request, db)
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    if base == compare:
+        return JSONResponse({"has_conflicts": False, "conflicting_files": []})
+
+    repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
+
+    if await git_utils.is_repo_empty(repo_path):
+        return JSONResponse({"has_conflicts": False, "conflicting_files": []})
+
+    try:
+        mt = await asyncio.to_thread(
+            subprocess.run,
+            ["git", "merge-tree", "--write-tree", base, compare],
+            cwd=repo_path, capture_output=True, text=True, timeout=30
+        )
+        has_conflicts = (mt.returncode != 0)
+        conflicting_files = []
+        if has_conflicts and mt.stdout:
+            for line in mt.stdout.splitlines():
+                if not line.strip():
+                    break
+                parts = line.split("\t")
+                if len(parts) == 2:
+                    filename = parts[1].strip()
+                    if filename not in conflicting_files:
+                        conflicting_files.append(filename)
+        return JSONResponse({"has_conflicts": has_conflicts, "conflicting_files": conflicting_files})
+    except Exception:
+        return JSONResponse({"has_conflicts": False, "conflicting_files": []})
 
 
 @router.get("/{username}/{repo_name}/pulls", response_class=HTMLResponse)
