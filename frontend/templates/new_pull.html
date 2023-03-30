@@ -24,7 +24,19 @@
                     <option value="{{ branch }}" {% if branch == compare %}selected{% endif %}>{{ branch }}</option>
                     {% endfor %}
                 </select>
-                <span id="conflict-badge" class="hidden"></span>
+                {% if base != compare and diff_files is defined %}
+                    {% if has_conflicts %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/60 text-red-400 border border-red-700"
+                          title="{{ conflicting_files | join(', ') }}">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        {{ conflicting_files | length }} conflict{{ 's' if conflicting_files | length != 1 else '' }}
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-900/60 text-green-400 border border-green-700">
+                        <i class="fa-solid fa-check"></i> No conflicts
+                    </span>
+                    {% endif %}
+                {% endif %}
             </div>
             <button type="submit" class="bg-github-blue hover:bg-blue-600 text-white font-semibold py-1.5 px-4 rounded-md text-sm transition-colors">
                 Compare
@@ -113,61 +125,12 @@
     </div>
     {% endif %}
 </div>
-
 <script>
 (function () {
-    const baseSelect = document.getElementById('base-select');
-    const compareSelect = document.getElementById('compare-select');
-    const badge = document.getElementById('conflict-badge');
-
-    if (!baseSelect || !compareSelect || !badge) return;
-
-    const apiBase = '/{{ owner.username }}/{{ repo.name }}/api/check-conflicts';
-
-    function showLoading() {
-        badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-700 text-gray-300';
-        badge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Checking…';
-    }
-
-    function showResult(data) {
-        if (data.has_conflicts) {
-            const count = data.conflicting_files.length;
-            const tip = count > 0 ? data.conflicting_files.join(', ') : 'Conflicts detected';
-            badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/60 text-red-400 border border-red-700 cursor-help';
-            badge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${count} conflict${count !== 1 ? 's' : ''}`;
-            badge.title = tip;
-        } else {
-            badge.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-900/60 text-green-400 border border-green-700';
-            badge.innerHTML = '<i class="fa-solid fa-check"></i> No conflicts';
-            badge.title = '';
-        }
-    }
-
-    let debounceTimer;
-    function checkConflicts() {
-        const base = baseSelect.value;
-        const compare = compareSelect.value;
-        if (base === compare) {
-            badge.className = 'hidden';
-            return;
-        }
-        showLoading();
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            fetch(`${apiBase}?base=${encodeURIComponent(base)}&compare=${encodeURIComponent(compare)}`)
-                .then(r => r.json())
-                .then(showResult)
-                .catch(() => { badge.className = 'hidden'; });
-        }, 300);
-    }
-
-    baseSelect.addEventListener('change', checkConflicts);
-    compareSelect.addEventListener('change', checkConflicts);
-
-    // Run on page load if branches are already selected
-    if (baseSelect.value && compareSelect.value && baseSelect.value !== compareSelect.value) {
-        checkConflicts();
-    }
+    const badge = document.querySelector('#compare-select ~ span');
+    if (!badge) return;
+    document.getElementById('base-select').addEventListener('change', () => badge.style.display = 'none');
+    document.getElementById('compare-select').addEventListener('change', () => badge.style.display = 'none');
 })();
 </script>
 {% endblock %}

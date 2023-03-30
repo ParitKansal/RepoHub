@@ -106,6 +106,8 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
     branches = []
     diff_files = []
+    has_conflicts = False
+    conflicting_files = []
 
     if not await git_utils.is_repo_empty(repo_path):
         branches = await git_utils.get_branches(repo_path)
@@ -116,6 +118,24 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
 
         if base in branches and compare in branches and base != compare:
             diff_files = await git_utils.get_branch_diff(repo_path, base, compare)
+            try:
+                mt = await asyncio.to_thread(
+                    subprocess.run,
+                    ["git", "merge-tree", "--write-tree", base, compare],
+                    cwd=repo_path, capture_output=True, text=True, timeout=30
+                )
+                has_conflicts = (mt.returncode != 0)
+                if has_conflicts and mt.stdout:
+                    for line in mt.stdout.splitlines():
+                        if not line.strip():
+                            break
+                        parts = line.split("\t")
+                        if len(parts) == 2:
+                            filename = parts[1].strip()
+                            if filename not in conflicting_files:
+                                conflicting_files.append(filename)
+            except Exception:
+                pass
 
     return templates.TemplateResponse(request=request, name="new_pull.html", context={
         "user": current_user,
@@ -124,7 +144,9 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
         "branches": branches,
         "base": base,
         "compare": compare,
-        "diff_files": diff_files
+        "diff_files": diff_files,
+        "has_conflicts": has_conflicts,
+        "conflicting_files": conflicting_files,
     })
 
 
