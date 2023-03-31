@@ -53,43 +53,42 @@
 <body class="bg-github-dark text-github-text min-h-screen font-sans antialiased flex flex-col">
 
     <!-- Top Navigation Bar -->
-    <nav class="bg-github-header border-b border-github-border text-white px-6 py-4 flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-            <a href="/" class="text-white hover:text-github-lblue flex items-center space-x-2 transition-colors">
-                <img src="/static/image.png" alt="GitClone" class="w-8 h-8">
-                <span class="text-xl font-semibold tracking-tight">GitClone</span>
+    <nav class="bg-github-header border-b border-github-border text-white px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <div class="flex items-center gap-3 min-w-0">
+            <a href="/" class="text-white hover:text-github-lblue flex items-center space-x-2 transition-colors flex-shrink-0">
+                <img src="/static/image.png" alt="GitClone" class="w-7 h-7 sm:w-8 sm:h-8">
+                <span class="text-lg sm:text-xl font-semibold tracking-tight">GitClone</span>
             </a>
 
             {% if user %}
-            <!-- Search Bar -->
-            <div class="hidden md:flex ml-4">
+            <div class="hidden sm:flex ml-2">
                 <form action="/search" method="GET" class="relative">
-                    <input type="text" name="q" placeholder="Search or jump to..." class="bg-github-darker border border-github-border rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue w-64 placeholder-gray-500" required>
+                    <input type="text" name="q" placeholder="Search or jump to..." class="bg-github-darker border border-github-border rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue w-48 md:w-64 placeholder-gray-500" required>
                     <button type="submit" class="absolute right-2 top-1.5 text-xs text-gray-500 border border-github-border rounded px-1 hover:text-white hover:border-github-blue">↵</button>
                 </form>
             </div>
             {% endif %}
         </div>
 
-        <div class="flex items-center space-x-4 text-sm font-semibold">
+        <div class="flex items-center gap-3 text-sm font-semibold flex-shrink-0">
             {% if user %}
-                <a href="/dashboard" class="hover:text-github-lblue transition-colors">Dashboard</a>
+                <a href="/dashboard" class="hidden sm:inline hover:text-github-lblue transition-colors">Dashboard</a>
                 <div class="flex items-center space-x-2">
-                    <div class="w-6 h-6 rounded-full bg-github-blue flex items-center justify-center text-xs text-white font-bold">
+                    <div class="w-6 h-6 rounded-full bg-github-blue flex items-center justify-center text-xs text-white font-bold flex-shrink-0">
                         {{ user.username[0]|upper }}
                     </div>
-                    <span>{{ user.username }}</span>
+                    <span class="hidden sm:inline truncate max-w-[120px]">{{ user.username }}</span>
                 </div>
                 <a href="/logout" class="text-gray-400 hover:text-github-lblue transition-colors"><i class="fa-solid fa-sign-out-alt"></i></a>
             {% else %}
                 <a href="/login" class="hover:text-github-lblue text-gray-300 transition-colors">Sign in</a>
-                <a href="/register" class="border border-github-blue hover:bg-github-blue text-github-lblue hover:text-white rounded-md px-3 py-1 transition-colors">Sign up</a>
+                <a href="/register" class="border border-github-blue hover:bg-github-blue text-github-lblue hover:text-white rounded-md px-3 py-1 transition-colors text-xs sm:text-sm">Sign up</a>
             {% endif %}
         </div>
     </nav>
 
     <!-- Main Content Area -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
+    <main class="max-w-screen-2xl mx-auto w-full px-4 sm:px-8 lg:px-16 py-8 flex-1">
         {% block content %}
         {% endblock %}
     </main>

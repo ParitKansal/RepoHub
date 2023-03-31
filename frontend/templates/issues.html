@@ -3,7 +3,7 @@
 
 {% block repo_content %}
 <div class="mt-4">
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
         <div class="flex space-x-2">
             <div class="bg-github-dark border border-github-border rounded-md flex overflow-hidden text-sm">
                 <a href="?state=open" class="px-3 py-1 font-semibold {% if state == 'open' %}text-white bg-github-header{% else %}text-gray-400 hover:text-white transition-colors{% endif %} border-r border-github-border flex items-center">

@@ -9,17 +9,16 @@
             {{ commit.message }}
         </h1>
         
-        <div class="flex items-center text-sm text-gray-400">
-            <div class="flex items-center space-x-2 mr-4">
-                <div class="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs text-white">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2 text-sm text-gray-400">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-xs text-white flex-shrink-0">
                     {{ commit.author[0]|upper }}
                 </div>
                 <span class="font-semibold text-gray-300 hover:text-github-blue cursor-pointer">{{ commit.author }}</span>
+                <span>committed on {{ commit.date }}</span>
             </div>
-            <span>committed on {{ commit.date }}</span>
-            
-            <div class="ml-auto flex items-center space-x-4">
-                <span class="font-mono text-xs text-github-blue">{{ commit.hash }}</span>
+            <div class="sm:ml-auto">
+                <span class="font-mono text-xs text-github-blue break-all">{{ commit.hash }}</span>
             </div>
         </div>
     </div>

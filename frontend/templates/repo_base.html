@@ -2,21 +2,23 @@
 
 {% block content %}
 <div class="mt-4 mb-6">
-    <div class="flex items-center space-x-2 text-xl mb-4">
-        <i class="fa-solid fa-book-bookmark text-github-blue"></i>
-        <a href="/{{ owner.username }}" class="text-github-blue hover:underline">{{ owner.username }}</a>
-        <span class="text-gray-500">/</span>
-        <a href="/{{ owner.username }}/{{ repo.name }}" class="font-bold text-github-blue hover:underline">{{ repo.name }}</a>
-        {% if repo.is_private %}
-        <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-yellow-500 font-semibold ml-2"><i class="fa-solid fa-lock mr-1"></i>Private</span>
-        {% else %}
-        <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-github-lblue font-semibold ml-2">Public</span>
-        {% endif %}
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 text-xl mb-4">
+        <div class="flex items-center gap-2 min-w-0">
+            <i class="fa-solid fa-book-bookmark text-github-blue flex-shrink-0"></i>
+            <a href="/{{ owner.username }}" class="text-github-blue hover:underline truncate">{{ owner.username }}</a>
+            <span class="text-gray-500">/</span>
+            <a href="/{{ owner.username }}/{{ repo.name }}" class="font-bold text-github-blue hover:underline truncate">{{ repo.name }}</a>
+            {% if repo.is_private %}
+            <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-yellow-500 font-semibold flex-shrink-0"><i class="fa-solid fa-lock mr-1"></i>Private</span>
+            {% else %}
+            <span class="border border-github-border rounded-full px-2 py-0.5 text-xs text-github-lblue font-semibold flex-shrink-0">Public</span>
+            {% endif %}
+        </div>
 
         <div class="flex-grow"></div>
 
         {% if user %}
-        <form action="/{{ owner.username }}/{{ repo.name }}/star" method="POST" class="inline">
+        <form action="/{{ owner.username }}/{{ repo.name }}/star" method="POST" class="inline flex-shrink-0">
             <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
             <button type="submit" class="border border-github-border bg-github-darker hover:bg-github-header text-sm font-semibold rounded-md px-3 py-1 transition-colors flex items-center">
                 {% set starred = namespace(value=false) %}

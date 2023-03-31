@@ -3,7 +3,7 @@
 
 {% block repo_content %}
 <div class="mt-4">
-    <div class="flex justify-between items-center mb-4">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
         <div class="flex space-x-2">
             <div class="bg-github-dark border border-github-border rounded-md flex overflow-hidden text-sm">
                 <button class="px-3 py-1 font-semibold text-white bg-github-header border-r border-github-border flex items-center">
@@ -42,15 +42,15 @@
                 </div>
                 <div class="flex-1">
                     <a href="/{{ owner.username }}/{{ repo.name }}/pull/{{ pr.id }}" class="text-white font-semibold text-base group-hover:text-github-blue">{{ pr.title }}</a>
-                    <div class="text-xs text-gray-500 mt-1">
-                        #{{ pr.id }}
-                        <span class="inline-flex items-center ml-1">
-                            <span class="font-mono bg-github-header border border-github-border rounded px-1 text-gray-400">{{ pr.source_branch }}</span>
-                            <i class="fa-solid fa-arrow-right mx-1"></i>
-                            <span class="font-mono bg-github-header border border-github-border rounded px-1 text-gray-400">{{ pr.target_branch }}</span>
+                    <div class="text-xs text-gray-500 mt-1 flex flex-wrap items-center gap-1">
+                        <span>#{{ pr.id }}</span>
+                        <span class="inline-flex items-center gap-1">
+                            <span class="font-mono bg-github-header border border-github-border rounded px-1 text-gray-400 truncate max-w-[80px] sm:max-w-none">{{ pr.source_branch }}</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                            <span class="font-mono bg-github-header border border-github-border rounded px-1 text-gray-400 truncate max-w-[80px] sm:max-w-none">{{ pr.target_branch }}</span>
                         </span>
-                        &mdash; opened by <a href="/{{ pr.author.username }}" class="hover:text-github-blue">{{ pr.author.username }}</a>
-                        on {{ pr.created_at.strftime('%b %d, %Y') }}
+                        <span>&mdash; opened by <a href="/{{ pr.author.username }}" class="hover:text-github-blue">{{ pr.author.username }}</a></span>
+                        <span class="hidden sm:inline">on {{ pr.created_at.strftime('%b %d, %Y') }}</span>
                     </div>
                 </div>
                 <div class="ml-4 flex-shrink-0">

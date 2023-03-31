@@ -4,7 +4,7 @@
 <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mt-6">
     
     <!-- Left Sidebar: Profile & Repos List -->
-    <div class="md:col-span-1 border-r border-github-border pr-6">
+    <div class="md:col-span-1 md:border-r border-github-border md:pr-6">
         <div class="flex items-center space-x-3 mb-6">
             <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-lg text-white">
                 {{ user.username[0]|upper }}
@@ -48,7 +48,7 @@
             <div class="divide-y divide-github-border">
                 {% if user.repositories %}
                     {% for repo in user.repositories %}
-                    <div class="p-6 hover:bg-gray-800/30 transition-colors flex justify-between items-start">
+                    <div class="p-4 sm:p-6 hover:bg-gray-800/30 transition-colors flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
                         <div>
                             <div class="flex items-center space-x-2 mb-1">
                                 <a href="/{{ user.username }}/{{ repo.name }}" class="text-xl font-semibold text-github-blue hover:underline break-words">{{ repo.name }}</a>
@@ -68,7 +68,7 @@
                             </div>
                         </div>
                         
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center">
                             <form action="/{{ user.username }}/{{ repo.name }}/star" method="POST" class="inline">
             <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrftoken', '') }}">
                                 <button type="submit" class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 px-3 py-1 rounded-md text-xs font-semibold flex items-center transition-colors">

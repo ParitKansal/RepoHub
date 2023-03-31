@@ -5,11 +5,11 @@
 <div class="mt-4">
     <!-- Issue Header -->
     <div class="mb-6 pb-6 border-b border-github-border">
-        <div class="flex items-start justify-between mb-2">
-            <h1 class="text-3xl text-white font-medium break-words">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-2">
+            <h1 class="text-2xl sm:text-3xl text-white font-medium break-words">
                 {{ issue.title }} <span class="text-gray-500 font-light">#{{ issue.id }}</span>
             </h1>
-            <a href="/{{ owner.username }}/{{ repo.name }}/issues/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-md text-sm shadow ml-4 flex-shrink-0">
+            <a href="/{{ owner.username }}/{{ repo.name }}/issues/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1 px-3 rounded-md text-sm shadow flex-shrink-0 self-start">
                 New issue
             </a>
         </div>
