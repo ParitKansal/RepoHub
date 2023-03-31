@@ -12,6 +12,23 @@ from ..config import settings
 router = APIRouter()
 
 
+def _parse_conflicting_files(stdout: str) -> list[str]:
+    seen: set[str] = set()
+    files: list[str] = []
+    lines = stdout.splitlines()
+    # First line is the tree OID; skip it. Skip blank lines but don't stop on them.
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) == 2:
+            filename = parts[1].strip()
+            if filename and filename not in seen:
+                seen.add(filename)
+                files.append(filename)
+    return files
+
+
 @router.get("/{username}/{repo_name}/api/check-conflicts")
 async def check_conflicts(
     request: Request,
@@ -42,23 +59,16 @@ async def check_conflicts(
     try:
         mt = await asyncio.to_thread(
             subprocess.run,
-            ["git", "merge-tree", "--write-tree", base, compare],
+            ["git", "merge-tree", "--write-tree", "--", base, compare],
             cwd=repo_path, capture_output=True, text=True, timeout=30
         )
         has_conflicts = (mt.returncode != 0)
-        conflicting_files = []
-        if has_conflicts and mt.stdout:
-            for line in mt.stdout.splitlines():
-                if not line.strip():
-                    break
-                parts = line.split("\t")
-                if len(parts) == 2:
-                    filename = parts[1].strip()
-                    if filename not in conflicting_files:
-                        conflicting_files.append(filename)
+        conflicting_files = _parse_conflicting_files(mt.stdout) if has_conflicts and mt.stdout else []
         return JSONResponse({"has_conflicts": has_conflicts, "conflicting_files": conflicting_files})
-    except Exception:
-        return JSONResponse({"has_conflicts": False, "conflicting_files": []})
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"error": "conflict check timed out"}, status_code=503)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @router.get("/{username}/{repo_name}/pulls", response_class=HTMLResponse)
@@ -123,21 +133,14 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
             try:
                 mt = await asyncio.to_thread(
                     subprocess.run,
-                    ["git", "merge-tree", "--write-tree", base, compare],
+                    ["git", "merge-tree", "--write-tree", "--", base, compare],
                     cwd=repo_path, capture_output=True, text=True, timeout=30
                 )
                 has_conflicts = (mt.returncode != 0)
                 if has_conflicts and mt.stdout:
-                    for line in mt.stdout.splitlines():
-                        if not line.strip():
-                            break
-                        parts = line.split("\t")
-                        if len(parts) == 2:
-                            filename = parts[1].strip()
-                            if filename not in conflicting_files:
-                                conflicting_files.append(filename)
-            except Exception:
-                pass
+                    conflicting_files = _parse_conflicting_files(mt.stdout)
+            except (subprocess.TimeoutExpired, Exception):
+                has_conflicts = None  # unknown — don't show badge
 
     return templates.TemplateResponse(request=request, name="new_pull.html", context={
         "user": current_user,
@@ -222,27 +225,19 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
         diff_files = await git_utils.get_branch_diff(repo_path, pr.target_branch, pr.source_branch)
         if pr.status == "Open":
             try:
-                # Modern git merge-tree check: returns 0 if clean, 1 if there are conflicts.
                 mt = await asyncio.to_thread(
                     subprocess.run,
-                    ["git", "merge-tree", "--write-tree", pr.target_branch, pr.source_branch],
+                    ["git", "merge-tree", "--write-tree", "--", pr.target_branch, pr.source_branch],
                     cwd=repo_path, capture_output=True, text=True, timeout=30
                 )
                 can_merge = (mt.returncode == 0)
-
                 if not can_merge and mt.stdout:
-                    for line in mt.stdout.splitlines():
-                        if not line.strip():
-                            break
-                        parts = line.split("\t")
-                        if len(parts) == 2:
-                            filename = parts[1].strip()
-                            if filename not in conflicting_files:
-                                conflicting_files.append(filename)
+                    conflicting_files = _parse_conflicting_files(mt.stdout)
+            except subprocess.TimeoutExpired:
+                can_merge = False
             except Exception:
-                can_merge = True
+                can_merge = False
 
-    print(f"DEBUG: pr_id={pr_id}, can_merge={can_merge}, conflicting_files={conflicting_files}")
     return templates.TemplateResponse(request=request, name="pull_detail.html", context={
         "user": current_user,
         "repo": repo,
