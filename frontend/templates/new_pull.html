@@ -24,7 +24,7 @@
                     <option value="{{ branch }}" {% if branch == compare %}selected{% endif %}>{{ branch }}</option>
                     {% endfor %}
                 </select>
-                {% if base != compare and diff_files is defined %}
+                {% if compared and base != compare %}
                     {% if has_conflicts %}
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/60 text-red-400 border border-red-700"
                           title="{{ conflicting_files | join(', ') }}">

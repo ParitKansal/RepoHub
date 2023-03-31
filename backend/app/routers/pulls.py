@@ -103,6 +103,8 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
     if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
         return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
 
+    compared = "compare" in request.query_params
+
     repo_path = os.path.join(settings.repos_dir, owner.username, f"{repo.name}.git")
     branches = []
     diff_files = []
@@ -145,6 +147,7 @@ async def new_pull_get(request: Request, username: str, repo_name: str, base: st
         "base": base,
         "compare": compare,
         "diff_files": diff_files,
+        "compared": compared,
         "has_conflicts": has_conflicts,
         "conflicting_files": conflicting_files,
     })
