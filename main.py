@@ -99,13 +99,23 @@ async def logout():
 async def search_repositories(request: Request, q: str = "", db: Session = Depends(get_db)):
     current_user = auth.get_current_user_from_cookie(request, db)
     
-    # Simple search by name or description for public repos
-    query = db.query(models.Repository).filter(models.Repository.is_private == False)
+    # Search by name, description, or owner username for public repos OR user's own repos
+    query = db.query(models.Repository).join(models.User, models.Repository.owner_id == models.User.id)
+    
+    if current_user:
+        query = query.filter(
+            (models.Repository.is_private == False) | 
+            (models.Repository.owner_id == current_user.id)
+        )
+    else:
+        query = query.filter(models.Repository.is_private == False)
+        
     if q:
         search_term = f"%{q}%"
         query = query.filter(
             (models.Repository.name.ilike(search_term)) | 
-            (models.Repository.description.ilike(search_term))
+            (models.Repository.description.ilike(search_term)) |
+            (models.User.username.ilike(search_term))
         )
         
     results = query.all()
