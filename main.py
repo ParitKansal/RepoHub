@@ -104,6 +104,25 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     repositories = db.query(models.Repository).filter(models.Repository.owner_id == user.id).all()
     return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "repositories": repositories})
 
+@app.get("/{username}", response_class=HTMLResponse)
+async def user_profile(request: Request, username: str, db: Session = Depends(get_db)):
+    # Find the user being viewed
+    profile_user = db.query(models.User).filter(models.User.username == username).first()
+    if not profile_user:
+        return RedirectResponse(url="/")
+        
+    # Get their repositories
+    repositories = db.query(models.Repository).filter(models.Repository.owner_id == profile_user.id).all()
+    
+    # Get current logged in user (if any) for navbar state
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    return templates.TemplateResponse(request=request, name="user_profile.html", context={
+        "user": current_user, 
+        "profile_user": profile_user,
+        "repositories": repositories
+    })
+
 @app.get("/repo/new", response_class=HTMLResponse)
 async def new_repo_get(request: Request, db: Session = Depends(get_db)):
     user = auth.get_current_user_from_cookie(request, db)
