@@ -23,6 +23,22 @@ def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
         print(f"Error creating git repo: {e.stderr}")
         return False
 
+def get_branches(repo_path: str) -> list:
+    if is_repo_empty(repo_path):
+        return []
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--format=%(refname:short)"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        branches = [b.strip() for b in result.stdout.strip().split('\n') if b.strip()]
+        return branches
+    except subprocess.CalledProcessError:
+        return []
+
 def is_repo_empty(repo_path: str) -> bool:
     try:
         result = subprocess.run(
@@ -36,13 +52,13 @@ def is_repo_empty(repo_path: str) -> bool:
     except subprocess.CalledProcessError:
         return True
 
-def get_repo_commits(repo_path: str, limit: int = 20) -> list:
+def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> list:
     if is_repo_empty(repo_path):
         return []
         
     try:
         result = subprocess.run(
-            ["git", "log", "--all", f"-n {limit}", "--pretty=format:%H|%an|%ar|%s"],
+            ["git", "log", branch, f"-n {limit}", "--pretty=format:%H|%an|%ar|%s"],
             cwd=repo_path,
             check=True,
             capture_output=True,
@@ -126,14 +142,14 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
     except subprocess.CalledProcessError:
         return None
 
-def get_repo_files(repo_path: str) -> list:
+def get_repo_files(repo_path: str, branch: str = "main") -> list:
     if is_repo_empty(repo_path):
         return []
         
     try:
-        # Get the latest commit hash from any branch
+        # Get the latest commit hash from the specific branch
         result_hash = subprocess.run(
-            ["git", "rev-list", "-n", "1", "--all"],
+            ["git", "rev-parse", branch],
             cwd=repo_path,
             check=True,
             capture_output=True,
@@ -165,11 +181,11 @@ def get_repo_files(repo_path: str) -> list:
     except subprocess.CalledProcessError:
         return []
 
-def get_file_content(repo_path: str, filepath: str) -> str:
+def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str:
     try:
-        # Get the latest commit hash from any branch
+        # Get the latest commit hash from the specific branch
         result_hash = subprocess.run(
-            ["git", "rev-list", "-n", "1", "--all"],
+            ["git", "rev-parse", branch],
             cwd=repo_path,
             check=True,
             capture_output=True,
