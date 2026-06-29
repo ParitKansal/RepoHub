@@ -1,31 +1,49 @@
 {% extends "base.html" %}
 
 {% block content %}
-<article>
-    <header>Register</header>
-    <form action="/register" method="POST">
-        <label for="username">
-            Username
-            <input type="text" id="username" name="username" placeholder="Username" required>
-        </label>
+<div class="max-w-md mx-auto mt-10">
+    <div class="text-center mb-6">
+        <i class="fa-brands fa-github text-5xl text-white mb-4"></i>
+        <h2 class="text-2xl font-light text-white tracking-tight">Create your account</h2>
+    </div>
+    
+    <div class="bg-github-header border border-github-border rounded-lg p-6 shadow-xl">
+        {% if error %}
+        <div class="bg-red-900/50 border border-github-red text-white px-4 py-3 rounded mb-4 relative" role="alert">
+            <span class="block sm:inline">{{ error }}</span>
+        </div>
+        {% endif %}
         
-        <label for="email">
-            Email
-            <input type="email" id="email" name="email" placeholder="Email" required>
-        </label>
-        
-        <label for="password">
-            Password
-            <input type="password" id="password" name="password" placeholder="Password" required>
-        </label>
-        
-        <label for="confirm_password">
-            Confirm Password
-            <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
-        </label>
-        
-        <button type="submit">Register</button>
-    </form>
-    <footer>Already have an account? <a href="/login">Login</a></footer>
-</article>
+        <form action="/register" method="POST" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-white mb-1">Username <span class="text-red-500">*</span></label>
+                <input type="text" id="username" name="username" required class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1.5 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue">
+            </div>
+            
+            <div>
+                <label for="email" class="block text-sm font-medium text-white mb-1">Email address <span class="text-red-500">*</span></label>
+                <input type="email" id="email" name="email" required class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1.5 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue">
+            </div>
+            
+            <div>
+                <label for="password" class="block text-sm font-medium text-white mb-1">Password <span class="text-red-500">*</span></label>
+                <input type="password" id="password" name="password" required class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1.5 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue">
+            </div>
+            
+            <div>
+                <label for="confirm_password" class="block text-sm font-medium text-white mb-1">Confirm Password <span class="text-red-500">*</span></label>
+                <input type="password" id="confirm_password" name="confirm_password" required class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1.5 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue">
+            </div>
+            
+            <button type="submit" class="w-full bg-github-green hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md transition-colors mt-4">
+                Sign up
+            </button>
+        </form>
+    </div>
+    
+    <div class="mt-4 border border-github-border rounded-lg p-4 text-center text-sm">
+        <span class="text-gray-400">Already have an account?</span>
+        <a href="/login" class="text-github-blue hover:underline">Sign in.</a>
+    </div>
+</div>
 {% endblock %}

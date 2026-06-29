@@ -2,21 +2,44 @@
 {% set current_tab = 'issues' %}
 
 {% block repo_content %}
-<article>
-    <header>Create a new issue</header>
-    <form action="/{{ owner.username }}/{{ repo.name }}/issues/new" method="POST">
-        <label for="title">
-            Title *
-            <input type="text" id="title" name="title" required>
-        </label>
+<div class="mt-4 max-w-4xl">
+    <div class="flex items-start space-x-4">
+        <!-- Avatar -->
+        <div class="hidden sm:block flex-shrink-0">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-lg text-white font-bold">
+                {{ user.username[0]|upper }}
+            </div>
+        </div>
         
-        <label for="description">
-            Description
-            <textarea id="description" name="description" rows="5"></textarea>
-        </label>
-        
-        <hr>
-        <button type="submit">Submit new issue</button>
-    </form>
-</article>
+        <!-- Form Area -->
+        <div class="flex-1 bg-github-dark border border-github-border rounded-lg relative overflow-hidden">
+            <!-- Triangle pointer for bubble effect -->
+            <div class="hidden sm:block absolute top-4 -left-2 w-3 h-3 bg-github-dark border-t border-l border-github-border transform -rotate-45"></div>
+            
+            <form action="/{{ owner.username }}/{{ repo.name }}/issues/new" method="POST">
+                <div class="bg-github-header border-b border-github-border px-4 py-2 text-sm text-gray-300 font-semibold flex space-x-4">
+                    <div class="border-b-2 border-[#f78166] text-white pb-2 cursor-pointer">Write</div>
+                    <div class="text-gray-500 pb-2 cursor-not-allowed">Preview</div>
+                </div>
+                
+                <div class="p-4 space-y-4">
+                    <div>
+                        <input type="text" id="title" name="title" placeholder="Title" required class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1.5 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-500 font-semibold">
+                    </div>
+                    
+                    <div>
+                        <textarea id="description" name="description" rows="8" placeholder="Leave a comment" class="w-full bg-github-dark border border-github-border rounded-md px-3 py-2 text-white focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-500 font-mono text-sm resize-y"></textarea>
+                    </div>
+                </div>
+                
+                <div class="bg-github-header border-t border-github-border px-4 py-3 flex justify-end items-center space-x-3">
+                    <a href="/{{ owner.username }}/{{ repo.name }}/issues" class="text-gray-400 hover:text-white text-sm">Cancel</a>
+                    <button type="submit" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1.5 px-4 rounded-md text-sm transition-colors shadow">
+                        Submit new issue
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
