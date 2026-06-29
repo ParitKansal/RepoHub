@@ -12,6 +12,14 @@
     </div>
 </div>
 
+<nav>
+    <ul>
+        <li><strong><a href="/{{ owner.username }}/{{ repo.name }}">Code</a></strong></li>
+        <li><a href="/{{ owner.username }}/{{ repo.name }}/commits">Commits</a></li>
+    </ul>
+</nav>
+
+{% if is_empty %}
 <article>
     <header>Quick setup — if you've done this kind of thing before</header>
     <p>Get started by cloning this repository or pushing an existing one.</p>
@@ -31,4 +39,31 @@ git branch -M main
 git remote add origin http://localhost:8080/repos/{{ owner.username }}/{{ repo.name }}.git
 git push -u origin main</code></pre>
 </article>
+{% else %}
+<article>
+    <header class="grid">
+        <div>
+            {% if latest_commit %}
+            <strong>{{ latest_commit.author }}</strong> 
+            <a href="#">{{ latest_commit.message }}</a>
+            {% endif %}
+        </div>
+        <div style="text-align: right;">
+            {% if latest_commit %}
+            <small>{{ latest_commit.time_ago }}</small>
+            {% endif %}
+        </div>
+    </header>
+    
+    <table role="grid">
+        <tbody>
+            {% for f in files %}
+            <tr>
+                <td><a href="/{{ owner.username }}/{{ repo.name }}/blob/{{ f }}">{{ f }}</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</article>
+{% endif %}
 {% endblock %}

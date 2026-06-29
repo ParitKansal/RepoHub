@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid">
+    <div>
+        <hgroup>
+            <h2>{{ owner.username }} / {{ repo.name }}</h2>
+        </hgroup>
+    </div>
+</div>
+
+<nav>
+    <ul>
+        <li><strong><a href="/{{ owner.username }}/{{ repo.name }}">Code</a></strong></li>
+        <li><a href="/{{ owner.username }}/{{ repo.name }}/commits">Commits</a></li>
+    </ul>
+</nav>
+
+<article>
+    <header>{{ filepath }}</header>
+    {% if content is not none %}
+    <pre><code>{{ content }}</code></pre>
+    {% else %}
+    <p>File not found or unable to read content.</p>
+    {% endif %}
+</article>
+{% endblock %}

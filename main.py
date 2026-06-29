@@ -164,4 +164,75 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
         return templates.TemplateResponse(request=request, name="repo_detail.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
         
     current_user = auth.get_current_user_from_cookie(request, db)
-    return templates.TemplateResponse(request=request, name="repo_detail.html", context={"user": current_user, "repo": repo, "owner": owner})
+    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    
+    is_empty = git_utils.is_repo_empty(repo_path)
+    files = []
+    latest_commit = None
+    
+    if not is_empty:
+        files = git_utils.get_repo_files(repo_path)
+        commits = git_utils.get_repo_commits(repo_path, limit=1)
+        if commits:
+            latest_commit = commits[0]
+
+    return templates.TemplateResponse(request=request, name="repo_detail.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "is_empty": is_empty,
+        "files": files,
+        "latest_commit": latest_commit
+    })
+
+@app.get("/{username}/{repo_name}/commits", response_class=HTMLResponse)
+async def repo_commits(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="commits.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return templates.TemplateResponse(request=request, name="commits.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    current_user = auth.get_current_user_from_cookie(request, db)
+    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    commits = git_utils.get_repo_commits(repo_path, limit=50)
+    
+    return templates.TemplateResponse(request=request, name="commits.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "commits": commits
+    })
+
+@app.get("/{username}/{repo_name}/blob/{filepath:path}", response_class=HTMLResponse)
+async def repo_blob(request: Request, username: str, repo_name: str, filepath: str, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="file_view.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return templates.TemplateResponse(request=request, name="file_view.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    current_user = auth.get_current_user_from_cookie(request, db)
+    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    
+    content = git_utils.get_file_content(repo_path, filepath)
+    
+    return templates.TemplateResponse(request=request, name="file_view.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "filepath": filepath,
+        "content": content
+    })
