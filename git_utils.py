@@ -1,5 +1,37 @@
 import subprocess
 import os
+import re
+
+
+def _is_valid_branch_name(branch: str) -> bool:
+    """Validate branch name to prevent git argument injection."""
+    if not branch or branch.startswith("-"):
+        return False
+    if ".." in branch or "~" in branch or "^" in branch or ":" in branch:
+        return False
+    if any(c in branch for c in [" ", "\\", "\x7f"]):
+        return False
+    if not re.match(r"^[a-zA-Z0-9._/\-]+$", branch):
+        return False
+    return True
+
+
+def _is_valid_commit_hash(commit_hash: str) -> bool:
+    """Validate that a commit hash is a valid hex string."""
+    if not commit_hash or commit_hash.startswith("-"):
+        return False
+    return bool(re.match(r"^[0-9a-fA-F]{4,40}$", commit_hash))
+
+
+def _is_valid_filepath(filepath: str) -> bool:
+    """Validate file path to prevent path traversal."""
+    if not filepath or filepath.startswith("-"):
+        return False
+    if ".." in filepath.split("/"):
+        return False
+    if filepath.startswith("/"):
+        return False
+    return True
 
 def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
     """
@@ -55,10 +87,12 @@ def is_repo_empty(repo_path: str) -> bool:
 def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> list:
     if is_repo_empty(repo_path):
         return []
-        
+    if not _is_valid_branch_name(branch):
+        return []
+
     try:
         result = subprocess.run(
-            ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%an|%ar|%s"],
+            ["git", "log", branch, "-n", str(int(limit)), "--pretty=format:%H|%an|%ar|%s"],
             cwd=repo_path,
             check=True,
             capture_output=True,
@@ -106,7 +140,9 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
     """
     if not os.path.exists(repo_path):
         return None
-        
+    if not _is_valid_commit_hash(commit_hash):
+        return None
+
     try:
         # Get metadata
         meta_result = subprocess.run(
@@ -145,7 +181,9 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
 def get_repo_files(repo_path: str, branch: str = "main") -> list:
     if is_repo_empty(repo_path):
         return []
-        
+    if not _is_valid_branch_name(branch):
+        return []
+
     try:
         # Get the latest commit hash from the specific branch
         result_hash = subprocess.run(
@@ -182,6 +220,11 @@ def get_repo_files(repo_path: str, branch: str = "main") -> list:
         return []
 
 def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str:
+    if not _is_valid_branch_name(branch):
+        return None
+    if not _is_valid_filepath(filepath):
+        return None
+
     try:
         # Get the latest commit hash from the specific branch
         result_hash = subprocess.run(

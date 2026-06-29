@@ -1,5 +1,8 @@
 import os
 import re
+from urllib.parse import urlparse
+
+import bleach
 import markdown
 from fastapi import FastAPI, Request, Depends, Form, Cookie, status, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -17,7 +20,45 @@ os.makedirs(REPOS_DIR, exist_ok=True)
 # Create database tables
 models.Base.metadata.create_all(bind=database.engine)
 
-app = FastAPI(title="GitClone College Project")
+app = FastAPI(
+    title="RepoHub",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
+
+
+ALLOWED_MARKDOWN_TAGS = [
+    "h1", "h2", "h3", "h4", "h5", "h6",
+    "p", "br", "hr",
+    "strong", "em", "b", "i", "u", "s", "del",
+    "ul", "ol", "li",
+    "a", "img",
+    "code", "pre", "blockquote",
+    "table", "thead", "tbody", "tr", "th", "td",
+    "div", "span",
+]
+
+ALLOWED_MARKDOWN_ATTRS = {
+    "a": ["href", "title", "rel"],
+    "img": ["src", "alt", "title"],
+    "td": ["align"],
+    "th": ["align"],
+}
+
+
+def _safe_redirect(referer: str, request: Request) -> str:
+    """Validate redirect URL is same-origin to prevent open redirects."""
+    if not referer:
+        return "/"
+    try:
+        parsed = urlparse(referer)
+        host = request.headers.get("host", "")
+        if parsed.netloc and parsed.netloc != host:
+            return "/"
+        return referer
+    except Exception:
+        return "/"
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")
@@ -58,7 +99,13 @@ async def login_post(
     # Create redirect response
     redirect = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
     # Set cookie
-    redirect.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    redirect.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
     return redirect
 
 @app.get("/register", response_class=HTMLResponse)
@@ -158,10 +205,11 @@ async def toggle_star(request: Request, username: str, repo_name: str, db: Sessi
         
     db.commit()
     
-    # Redirect back to where they came from
+    # Redirect back to where they came from (validated same-origin)
     referer = request.headers.get("referer")
-    if referer:
-        return RedirectResponse(url=referer, status_code=303)
+    safe_url = _safe_redirect(referer, request)
+    if safe_url and safe_url != "/":
+        return RedirectResponse(url=safe_url, status_code=303)
     return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -284,7 +332,13 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
                 try:
                     readme_content = git_utils.get_file_content(repo_path, file['name'], branch=branch)
                     if readme_content:
-                        readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
+                        raw_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
+                        readme_html = bleach.clean(
+                            raw_html,
+                            tags=ALLOWED_MARKDOWN_TAGS,
+                            attributes=ALLOWED_MARKDOWN_ATTRS,
+                            strip=True,
+                        )
                 except Exception:
                     pass
         
@@ -630,26 +684,27 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
 @app.get("/{username}/{repo_name}/commit/{commit_hash}", response_class=HTMLResponse)
 async def commit_detail(request: Request, username: str, repo_name: str, commit_hash: str, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
-    
+    if not owner:
+        return RedirectResponse(url="/", status_code=303)
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id,
         models.Repository.name == repo_name
     ).first()
-    
-    user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not user or user.id != owner.id)):
+
+    current_user = auth.get_current_user_from_cookie(request, db)
+
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
         return RedirectResponse(url="/", status_code=303)
-        
+
     repo_path = os.path.join(REPOS_DIR, username, repo_name + ".git")
     commit_data = git_utils.get_commit_details(repo_path, commit_hash)
-    
+
     if not commit_data:
         return RedirectResponse(url=f"/{username}/{repo_name}/commits")
-        
-    
+
     return templates.TemplateResponse(request=request, name="commit_detail.html", context={
-        "user": user,
+        "user": current_user,
         "repo": repo,
         "owner": owner,
         "commit": commit_data
@@ -698,26 +753,29 @@ async def new_issue_get(request: Request, username: str, repo_name: str, db: Ses
     user = auth.get_current_user_from_cookie(request, db)
     if not user:
         return RedirectResponse(url="/login")
-        
+
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/dashboard")
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id,
         models.Repository.name == repo_name
     ).first()
-    
-    if not repo:
+
+    if not repo or (repo.is_private and user.id != owner.id):
         return RedirectResponse(url="/dashboard")
-        
+
     return templates.TemplateResponse(request=request, name="new_issue.html", context={
-        "user": user, 
-        "repo": repo, 
+        "user": user,
+        "repo": repo,
         "owner": owner
     })
 
 @app.post("/{username}/{repo_name}/issues/new")
 async def new_issue_post(
     request: Request,
-    username: str, 
+    username: str,
     repo_name: str,
     title: str = Form(...),
     description: str = Form(None),
@@ -726,14 +784,17 @@ async def new_issue_post(
     user = auth.get_current_user_from_cookie(request, db)
     if not user:
         return RedirectResponse(url="/login")
-        
+
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/dashboard")
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id,
         models.Repository.name == repo_name
     ).first()
-    
-    if not repo:
+
+    if not repo or (repo.is_private and user.id != owner.id):
         return RedirectResponse(url="/dashboard")
         
     new_issue = models.Issue(
@@ -751,23 +812,26 @@ async def new_issue_post(
 @app.get("/{username}/{repo_name}/issues/{issue_id}", response_class=HTMLResponse)
 async def issue_detail(request: Request, username: str, repo_name: str, issue_id: int, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/dashboard")
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id,
         models.Repository.name == repo_name
     ).first()
-    
-    if not repo:
+
+    current_user = auth.get_current_user_from_cookie(request, db)
+
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
         return RedirectResponse(url="/dashboard")
-        
+
     issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
     if not issue:
         return RedirectResponse(url=f"/{username}/{repo_name}/issues")
-        
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
+
     return templates.TemplateResponse(request=request, name="issue_detail.html", context={
-        "user": current_user, 
-        "repo": repo, 
+        "user": current_user,
+        "repo": repo,
         "owner": owner,
         "issue": issue
     })

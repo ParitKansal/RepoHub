@@ -1,3 +1,5 @@
+import os
+import secrets
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -5,10 +7,9 @@ from fastapi import Request, HTTPException
 from sqlalchemy.orm import Session
 import models
 
-# Secret key for JWT. In a real app, keep this in an env var.
-SECRET_KEY = "super-secret-key-for-college-project"
+SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_urlsafe(64)
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
