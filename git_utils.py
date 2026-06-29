@@ -142,13 +142,25 @@ def get_repo_files(repo_path: str) -> list:
         latest_hash = result_hash.stdout.strip()
         
         result = subprocess.run(
-            ["git", "ls-tree", latest_hash, "--name-only"],
+            ["git", "ls-tree", latest_hash],
             cwd=repo_path,
             check=True,
             capture_output=True,
             text=True
         )
-        files = [f for f in result.stdout.strip().split('\n') if f]
+        files = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.split(maxsplit=3)
+                if len(parts) == 4:
+                    files.append({
+                        "mode": parts[0],
+                        "type": parts[1],
+                        "hash": parts[2],
+                        "name": parts[3]
+                    })
+        # Sort files: directories (trees) first, then blobs
+        files.sort(key=lambda x: (x["type"] != "tree", x["name"]))
         return files
     except subprocess.CalledProcessError:
         return []
