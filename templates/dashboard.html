@@ -9,11 +9,16 @@
 </div>
 
 <article>
-    <header>Your Repositories</header>
+    <header class="grid">
+        <div>Your Repositories</div>
+        <div style="text-align: right;">
+            <a href="/repo/new" role="button" class="outline">New Repository</a>
+        </div>
+    </header>
     {% if repositories %}
         <ul>
         {% for repo in repositories %}
-            <li><strong>{{ repo.name }}</strong>: {{ repo.description }}</li>
+            <li><strong><a href="/{{ user.username }}/{{ repo.name }}">{{ repo.name }}</a></strong>: {{ repo.description }}</li>
         {% endfor %}
         </ul>
     {% else %}

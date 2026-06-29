@@ -7,6 +7,11 @@ from sqlalchemy.orm import Session
 import models
 import database
 import auth
+import git_utils
+import re
+
+REPOS_DIR = "./repos"
+os.makedirs(REPOS_DIR, exist_ok=True)
 
 # Create database tables
 models.Base.metadata.create_all(bind=database.engine)
@@ -98,3 +103,65 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     
     repositories = db.query(models.Repository).filter(models.Repository.owner_id == user.id).all()
     return templates.TemplateResponse(request=request, name="dashboard.html", context={"user": user, "repositories": repositories})
+
+@app.get("/repo/new", response_class=HTMLResponse)
+async def new_repo_get(request: Request, db: Session = Depends(get_db)):
+    user = auth.get_current_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse(url="/login")
+    return templates.TemplateResponse(request=request, name="new_repo.html", context={"user": user})
+
+@app.post("/repo/new")
+async def new_repo_post(
+    request: Request,
+    repo_name: str = Form(...),
+    description: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    user = auth.get_current_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse(url="/login")
+        
+    # Basic validation for repository name (alphanumeric and dashes)
+    if not re.match(r"^[a-zA-Z0-9_-]+$", repo_name):
+        return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Invalid repository name", "user": user})
+
+    # Check if repo already exists for this user
+    existing_repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == user.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if existing_repo:
+        return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Repository already exists", "user": user})
+
+    # Create physically on disk
+    success = git_utils.create_bare_repo(REPOS_DIR, user.username, repo_name)
+    if not success:
+        return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Failed to create git repository on disk", "user": user})
+
+    # Save to database
+    new_repo = models.Repository(name=repo_name, description=description, owner_id=user.id)
+    db.add(new_repo)
+    db.commit()
+    
+    return RedirectResponse(url=f"/{user.username}/{repo_name}", status_code=status.HTTP_302_FOUND)
+
+@app.get("/{username}/{repo_name}", response_class=HTMLResponse)
+async def repo_detail(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    # Look up the owner
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="repo_detail.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    # Look up the repo
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return templates.TemplateResponse(request=request, name="repo_detail.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
+        
+    current_user = auth.get_current_user_from_cookie(request, db)
+    return templates.TemplateResponse(request=request, name="repo_detail.html", context={"user": current_user, "repo": repo, "owner": owner})
