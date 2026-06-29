@@ -22,11 +22,11 @@
             </a>
         </div>
         
-        <input type="text" placeholder="Find a repository..." class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1 mb-4 text-sm focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-600">
+        <input type="text" id="repo-search" placeholder="Find a repository..." class="w-full bg-github-dark border border-github-border rounded-md px-3 py-1 mb-4 text-sm focus:outline-none focus:border-github-blue focus:ring-1 focus:ring-github-blue placeholder-gray-600">
 
         <ul class="space-y-3">
             {% for repo in user.repositories %}
-            <li>
+            <li class="repo-item" data-name="{{ repo.name }}">
                 <a href="/{{ user.username }}/{{ repo.name }}" class="flex items-center space-x-2 group">
                     <div class="w-6 h-6 rounded-full bg-github-header border border-github-border flex items-center justify-center group-hover:bg-gray-800 transition-colors">
                         <i class="{% if repo.is_private %}fa-solid fa-lock text-yellow-500{% else %}fa-solid fa-user text-gray-400{% endif %} text-xs"></i>
@@ -86,4 +86,25 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const searchInput = document.getElementById('repo-search');
+    const repoItems = document.querySelectorAll('.repo-item');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase();
+            repoItems.forEach(item => {
+                const name = item.getAttribute('data-name').toLowerCase();
+                if (name.includes(term)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+    }
+});
+</script>
 {% endblock %}
