@@ -203,3 +203,27 @@ def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str
         return result.stdout
     except subprocess.CalledProcessError:
         return None
+
+def get_contributors(repo_path: str) -> list:
+    if is_repo_empty(repo_path):
+        return []
+    try:
+        result = subprocess.run(
+            ["git", "shortlog", "-sn", "--all"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        contributors = []
+        for line in result.stdout.strip().split('\n'):
+            if line:
+                parts = line.strip().split('\t', 1)
+                if len(parts) == 2:
+                    contributors.append({
+                        "commits": int(parts[0]),
+                        "name": parts[1]
+                    })
+        return contributors
+    except subprocess.CalledProcessError:
+        return []
