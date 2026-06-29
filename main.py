@@ -111,11 +111,14 @@ async def user_profile(request: Request, username: str, db: Session = Depends(ge
     if not profile_user:
         return RedirectResponse(url="/")
         
-    # Get their repositories
-    repositories = db.query(models.Repository).filter(models.Repository.owner_id == profile_user.id).all()
-    
-    # Get current logged in user (if any) for navbar state
+    # Get their repositories (filter out private ones unless viewing own profile)
     current_user = auth.get_current_user_from_cookie(request, db)
+    
+    query = db.query(models.Repository).filter(models.Repository.owner_id == profile_user.id)
+    if not current_user or current_user.id != profile_user.id:
+        query = query.filter(models.Repository.is_private == False)
+        
+    repositories = query.all()
     
     return templates.TemplateResponse(request=request, name="user_profile.html", context={
         "user": current_user, 
@@ -130,16 +133,19 @@ async def new_repo_get(request: Request, db: Session = Depends(get_db)):
         return RedirectResponse(url="/login")
     return templates.TemplateResponse(request=request, name="new_repo.html", context={"user": user})
 
-@app.post("/repo/new")
+@app.post("/repo/new", response_class=HTMLResponse)
 async def new_repo_post(
-    request: Request,
-    repo_name: str = Form(...),
+    request: Request, 
+    repo_name: str = Form(...), 
     description: str = Form(None),
+    visibility: str = Form("public"),
     db: Session = Depends(get_db)
 ):
     user = auth.get_current_user_from_cookie(request, db)
     if not user:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url="/login", status_code=303)
+        
+    is_private = (visibility == "private")
         
     # Basic validation for repository name (alphanumeric and dashes)
     if not re.match(r"^[a-zA-Z0-9_-]+$", repo_name):
@@ -160,7 +166,7 @@ async def new_repo_post(
         return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Failed to create git repository on disk", "user": user})
 
     # Save to database
-    new_repo = models.Repository(name=repo_name, description=description, owner_id=user.id)
+    new_repo = models.Repository(name=repo_name, description=description, is_private=is_private, owner_id=user.id)
     db.add(new_repo)
     db.commit()
     
@@ -179,10 +185,11 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
         models.Repository.name == repo_name
     ).first()
     
-    if not repo:
-        return templates.TemplateResponse(request=request, name="repo_detail.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
     current_user = auth.get_current_user_from_cookie(request, db)
+    
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="repo_detail.html", context={"error": "Repository not found", "user": current_user})
+        
     repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
     
     is_empty = git_utils.is_repo_empty(repo_path)
@@ -215,10 +222,11 @@ async def repo_commits(request: Request, username: str, repo_name: str, db: Sess
         models.Repository.name == repo_name
     ).first()
     
-    if not repo:
-        return templates.TemplateResponse(request=request, name="commits.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
     current_user = auth.get_current_user_from_cookie(request, db)
+    
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="commits.html", context={"error": "Repository not found", "user": current_user})
+        
     repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
     commits = git_utils.get_repo_commits(repo_path, limit=50)
     
@@ -240,10 +248,11 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
         models.Repository.name == repo_name
     ).first()
     
-    if not repo:
-        return templates.TemplateResponse(request=request, name="file_view.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
     current_user = auth.get_current_user_from_cookie(request, db)
+    
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="file_view.html", context={"error": "Repository not found", "user": current_user})
+        
     repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
     
     content = git_utils.get_file_content(repo_path, filepath)
@@ -259,16 +268,16 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
 @app.get("/{username}/{repo_name}/commit/{commit_hash}", response_class=HTMLResponse)
 async def commit_detail(request: Request, username: str, repo_name: str, commit_hash: str, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return RedirectResponse(url="/dashboard")
-        
+    
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
+        models.Repository.owner_id == owner.id if owner else False, 
         models.Repository.name == repo_name
     ).first()
     
-    if not repo:
-        return RedirectResponse(url="/dashboard")
+    user = auth.get_current_user_from_cookie(request, db)
+    
+    if not repo or (repo.is_private and (not user or user.id != owner.id)):
+        return RedirectResponse(url="/", status_code=303)
         
     repo_path = os.path.join(REPOS_DIR, username, repo_name + ".git")
     commit_data = git_utils.get_commit_details(repo_path, commit_hash)
@@ -276,7 +285,6 @@ async def commit_detail(request: Request, username: str, repo_name: str, commit_
     if not commit_data:
         return RedirectResponse(url=f"/{username}/{repo_name}/commits")
         
-    current_user = auth.get_current_user_from_cookie(request, db)
     
     return templates.TemplateResponse(request=request, name="commit_detail.html", context={
         "user": current_user, 
@@ -296,8 +304,10 @@ async def repo_issues(request: Request, username: str, repo_name: str, state: st
         models.Repository.name == repo_name
     ).first()
     
-    if not repo:
-        return templates.TemplateResponse(request=request, name="issues.html", context={"error": "Repository not found", "user": auth.get_current_user_from_cookie(request, db)})
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="issues.html", context={"error": "Repository not found", "user": current_user})
         
     open_count = db.query(models.Issue).filter(models.Issue.repo_id == repo.id, models.Issue.status == "Open").count()
     closed_count = db.query(models.Issue).filter(models.Issue.repo_id == repo.id, models.Issue.status == "Closed").count()
