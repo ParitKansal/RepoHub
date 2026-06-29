@@ -1,0 +1,28 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'issues' %}
+
+{% block repo_content %}
+<article>
+    <header class="grid">
+        <div>
+            <h2>{{ issue.title }} <small style="color: grey;">#{{ issue.id }}</small></h2>
+            <div>
+                {% if issue.status == 'Open' %}
+                <mark style="background-color: #2ecc71; color: white; padding: 5px; border-radius: 5px;">Open</mark>
+                {% else %}
+                <mark style="background-color: #e74c3c; color: white; padding: 5px; border-radius: 5px;">Closed</mark>
+                {% endif %}
+                <strong>{{ issue.author.username }}</strong> opened this issue
+            </div>
+        </div>
+    </header>
+    
+    <div>
+        {% if issue.description %}
+        <p style="white-space: pre-wrap;">{{ issue.description }}</p>
+        {% else %}
+        <p><em>No description provided.</em></p>
+        {% endif %}
+    </div>
+</article>
+{% endblock %}

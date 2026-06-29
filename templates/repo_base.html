@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid">
+    <div>
+        <hgroup>
+            <h2>{{ owner.username }} / {{ repo.name }}</h2>
+            {% if repo.description and current_tab == 'code' %}
+            <h3>{{ repo.description }}</h3>
+            {% endif %}
+        </hgroup>
+    </div>
+</div>
+
+<nav>
+    <ul>
+        <li>{% if current_tab == 'code' %}<strong>{% endif %}<a href="/{{ owner.username }}/{{ repo.name }}">Code</a>{% if current_tab == 'code' %}</strong>{% endif %}</li>
+        <li>{% if current_tab == 'commits' %}<strong>{% endif %}<a href="/{{ owner.username }}/{{ repo.name }}/commits">Commits</a>{% if current_tab == 'commits' %}</strong>{% endif %}</li>
+        <li>{% if current_tab == 'issues' %}<strong>{% endif %}<a href="/{{ owner.username }}/{{ repo.name }}/issues">Issues</a>{% if current_tab == 'issues' %}</strong>{% endif %}</li>
+    </ul>
+</nav>
+
+{% block repo_content %}{% endblock %}
+{% endblock %}

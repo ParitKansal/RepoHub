@@ -1,0 +1,38 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'issues' %}
+
+{% block repo_content %}
+<article>
+    <header class="grid">
+        <div>Issues</div>
+        <div style="text-align: right;">
+            <a href="/{{ owner.username }}/{{ repo.name }}/issues/new" role="button" class="outline">New Issue</a>
+        </div>
+    </header>
+    
+    {% if issues %}
+    <table role="grid">
+        <tbody>
+            {% for issue in issues %}
+            <tr>
+                <td>
+                    <small>
+                        {% if issue.status == 'Open' %}
+                        <span style="color: #2ecc71;">[Open]</span>
+                        {% else %}
+                        <span style="color: #e74c3c;">[Closed]</span>
+                        {% endif %}
+                    </small>
+                    <strong><a href="/{{ owner.username }}/{{ repo.name }}/issues/{{ issue.id }}">{{ issue.title }}</a></strong>
+                    <br>
+                    <small>#{{ issue.id }} opened by {{ issue.author.username }}</small>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No issues yet! Be the first to start a conversation.</p>
+    {% endif %}
+</article>
+{% endblock %}
