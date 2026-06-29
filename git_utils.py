@@ -1,5 +1,8 @@
+import logging
 import subprocess
 import os
+
+logger = logging.getLogger(__name__)
 
 def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
     """
@@ -20,7 +23,7 @@ def create_bare_repo(repos_dir: str, username: str, repo_name: str) -> bool:
         )
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error creating git repo: {e.stderr}")
+        logger.error("Failed to create bare repo at '%s': %s", repo_path, e.stderr)
         return False
 
 def get_branches(repo_path: str) -> list:
@@ -37,6 +40,7 @@ def get_branches(repo_path: str) -> list:
         branches = [b.strip() for b in result.stdout.strip().split('\n') if b.strip()]
         return branches
     except subprocess.CalledProcessError:
+        logger.exception("Failed to list branches for repo '%s'", repo_path)
         return []
 
 def is_repo_empty(repo_path: str) -> bool:
@@ -50,6 +54,7 @@ def is_repo_empty(repo_path: str) -> bool:
         )
         return len(result.stdout.strip()) == 0
     except subprocess.CalledProcessError:
+        logger.exception("Failed to check if repo '%s' is empty", repo_path)
         return True
 
 def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> list:
@@ -77,6 +82,7 @@ def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> l
                     })
         return commits
     except subprocess.CalledProcessError:
+        logger.exception("Failed to get commits for branch '%s' in repo '%s'", branch, repo_path)
         return []
 
 def parse_diff(diff_text: str) -> list:
@@ -140,6 +146,7 @@ def get_commit_details(repo_path: str, commit_hash: str) -> dict:
             "diff_files": diff_files
         }
     except subprocess.CalledProcessError:
+        logger.exception("Failed to get details for commit '%s' in repo '%s'", commit_hash, repo_path)
         return None
 
 def get_repo_files(repo_path: str, branch: str = "main") -> list:
@@ -179,6 +186,7 @@ def get_repo_files(repo_path: str, branch: str = "main") -> list:
         files.sort(key=lambda x: (x["type"] != "tree", x["name"]))
         return files
     except subprocess.CalledProcessError:
+        logger.exception("Failed to list files for branch '%s' in repo '%s'", branch, repo_path)
         return []
 
 def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str:
@@ -202,6 +210,7 @@ def get_file_content(repo_path: str, filepath: str, branch: str = "main") -> str
         )
         return result.stdout
     except subprocess.CalledProcessError:
+        logger.exception("Failed to read file '%s' from branch '%s' in repo '%s'", filepath, branch, repo_path)
         return None
 
 def get_contributors(repo_path: str) -> list:
@@ -226,6 +235,7 @@ def get_contributors(repo_path: str) -> list:
                     })
         return contributors
     except subprocess.CalledProcessError:
+        logger.exception("Failed to get contributors for repo '%s'", repo_path)
         return []
 
 def get_branch_diff(repo_path: str, target_branch: str, source_branch: str) -> list:

@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import markdown
@@ -6,10 +7,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 import models
 import database
 import auth
 import git_utils
+
+logger = logging.getLogger(__name__)
 
 REPOS_DIR = "./repos"
 os.makedirs(REPOS_DIR, exist_ok=True)
@@ -85,8 +89,13 @@ async def register_post(
     hashed_password = auth.get_password_hash(password)
     new_user = models.User(username=username, email=email, hashed_password=hashed_password)
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        db.commit()
+        db.refresh(new_user)
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to register user '%s'", username)
+        return templates.TemplateResponse(request=request, name="register.html", context={"error": "Registration failed. Please try again.", "user": None})
     
     return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
@@ -155,8 +164,12 @@ async def toggle_star(request: Request, username: str, repo_name: str, db: Sessi
     else:
         new_star = models.Star(user_id=user.id, repo_id=repo.id)
         db.add(new_star)
-        
-    db.commit()
+
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to toggle star for repo %s/%s", username, repo_name)
     
     # Redirect back to where they came from
     referer = request.headers.get("referer")
@@ -237,7 +250,12 @@ async def new_repo_post(
     # Save to database
     new_repo = models.Repository(name=repo_name, description=description, is_private=is_private, owner_id=user.id)
     db.add(new_repo)
-    db.commit()
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to save repo '%s' to database", repo_name)
+        return templates.TemplateResponse(request=request, name="new_repo.html", context={"error": "Failed to create repository. Please try again.", "user": user})
     
     return RedirectResponse(url=f"/{user.username}/{repo_name}", status_code=status.HTTP_302_FOUND)
 
@@ -286,7 +304,7 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
                     if readme_content:
                         readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
                 except Exception:
-                    pass
+                    logger.exception("Failed to render README.md for %s/%s", username, repo_name)
         
         contributors = git_utils.get_contributors(repo_path)
 
@@ -555,6 +573,9 @@ async def repo_settings(request: Request, username: str, repo_name: str, db: Ses
         return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
         
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/", status_code=303)
+
     repo = db.query(models.Repository).filter(
         models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
@@ -576,6 +597,9 @@ async def delete_repo(request: Request, username: str, repo_name: str, db: Sessi
         return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
         
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
     repo = db.query(models.Repository).filter(
         models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
@@ -584,7 +608,12 @@ async def delete_repo(request: Request, username: str, repo_name: str, db: Sessi
     if repo:
         # Delete from db
         db.delete(repo)
-        db.commit()
+        try:
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            logger.exception("Failed to delete repo '%s/%s' from database", username, repo_name)
+            return RedirectResponse(url=f"/{username}/{repo_name}/settings", status_code=303)
         
         # Delete from disk
         import shutil
@@ -630,23 +659,24 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
 @app.get("/{username}/{repo_name}/commit/{commit_hash}", response_class=HTMLResponse)
 async def commit_detail(request: Request, username: str, repo_name: str, commit_hash: str, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
     
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
     ).first()
     
-    user = auth.get_current_user_from_cookie(request, db)
+    current_user = auth.get_current_user_from_cookie(request, db)
     
-    if not repo or (repo.is_private and (not user or user.id != owner.id)):
-        return RedirectResponse(url="/", status_code=303)
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
         
     repo_path = os.path.join(REPOS_DIR, username, repo_name + ".git")
     commit_data = git_utils.get_commit_details(repo_path, commit_hash)
     
     if not commit_data:
         return RedirectResponse(url=f"/{username}/{repo_name}/commits")
-        
     
     return templates.TemplateResponse(request=request, name="commit_detail.html", context={
         "user": user,
@@ -700,8 +730,11 @@ async def new_issue_get(request: Request, username: str, repo_name: str, db: Ses
         return RedirectResponse(url="/login")
         
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": user})
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
     ).first()
     
@@ -728,8 +761,11 @@ async def new_issue_post(
         return RedirectResponse(url="/login")
         
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": user})
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
     ).first()
     
@@ -743,27 +779,35 @@ async def new_issue_post(
         author_id=user.id
     )
     db.add(new_issue)
-    db.commit()
-    db.refresh(new_issue)
+    try:
+        db.commit()
+        db.refresh(new_issue)
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to create issue in repo '%s/%s'", username, repo_name)
+        return templates.TemplateResponse(request=request, name="new_issue.html", context={"error": "Failed to create issue. Please try again.", "user": user, "repo": repo, "owner": owner})
     
     return RedirectResponse(url=f"/{username}/{repo_name}/issues/{new_issue.id}", status_code=status.HTTP_302_FOUND)
 
 @app.get("/{username}/{repo_name}/issues/{issue_id}", response_class=HTMLResponse)
 async def issue_detail(request: Request, username: str, repo_name: str, issue_id: int, db: Session = Depends(get_db)):
+    current_user = auth.get_current_user_from_cookie(request, db)
+
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": current_user})
+
     repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
+        models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
     ).first()
     
     if not repo:
-        return RedirectResponse(url="/dashboard")
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
         
     issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
     if not issue:
         return RedirectResponse(url=f"/{username}/{repo_name}/issues")
-        
-    current_user = auth.get_current_user_from_cookie(request, db)
     
     return templates.TemplateResponse(request=request, name="issue_detail.html", context={
         "user": current_user, 
@@ -786,10 +830,15 @@ async def add_issue_comment(
         return RedirectResponse(url="/login")
         
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/", status_code=303)
+
     repo = db.query(models.Repository).filter(
         models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
     ).first()
+    if not repo:
+        return RedirectResponse(url="/", status_code=303)
     
     issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
     if not issue:
@@ -801,7 +850,12 @@ async def add_issue_comment(
         author_id=current_user.id
     )
     db.add(new_comment)
-    db.commit()
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to add comment to issue #%d in '%s/%s'", issue_id, username, repo_name)
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}", status_code=303)
     
     return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}", status_code=status.HTTP_302_FOUND)
 
@@ -818,10 +872,15 @@ async def close_issue(
         return RedirectResponse(url="/login")
         
     owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/", status_code=303)
+
     repo = db.query(models.Repository).filter(
         models.Repository.owner_id == owner.id, 
         models.Repository.name == repo_name
     ).first()
+    if not repo:
+        return RedirectResponse(url="/", status_code=303)
     
     issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
     if not issue:
@@ -835,6 +894,10 @@ async def close_issue(
         issue.status = "Closed"
     else:
         issue.status = "Open"
-        
-    db.commit()
+
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to toggle issue #%d status in '%s/%s'", issue_id, username, repo_name)
     return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}", status_code=status.HTTP_302_FOUND)
