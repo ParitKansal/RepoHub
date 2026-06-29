@@ -227,3 +227,61 @@ def get_contributors(repo_path: str) -> list:
         return contributors
     except subprocess.CalledProcessError:
         return []
+
+def get_branch_diff(repo_path: str, target_branch: str, source_branch: str) -> list:
+    """
+    Returns the diff files between target_branch and source_branch
+    """
+    try:
+        result = subprocess.run(
+            ["git", "diff", f"{target_branch}...{source_branch}", "--patch"],
+            cwd=repo_path,
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        return parse_diff(result.stdout)
+    except subprocess.CalledProcessError:
+        return []
+
+def merge_branches(repo_path: str, target_branch: str, source_branch: str, author_name: str, author_email: str) -> bool:
+    """
+    Attempts to merge source_branch into target_branch.
+    Returns True if successful, False if there are conflicts.
+    """
+    import tempfile
+    import shutil
+    
+    temp_dir = tempfile.mkdtemp()
+    abs_repo_path = os.path.abspath(repo_path)
+    try:
+        # Clone the bare repo to a temp directory
+        subprocess.run(["git", "clone", abs_repo_path, "."], cwd=temp_dir, check=True, capture_output=True)
+        
+        # Configure local git user for the merge commit
+        subprocess.run(["git", "config", "user.name", author_name], cwd=temp_dir, check=True)
+        subprocess.run(["git", "config", "user.email", author_email], cwd=temp_dir, check=True)
+        
+        # Checkout target branch
+        subprocess.run(["git", "checkout", target_branch], cwd=temp_dir, check=True, capture_output=True)
+        
+        # Attempt to merge source branch
+        merge_result = subprocess.run(
+            ["git", "merge", f"origin/{source_branch}", "--no-ff", "-m", f"Merge branch '{source_branch}' into {target_branch}"],
+            cwd=temp_dir,
+            capture_output=True,
+            text=True
+        )
+        
+        if merge_result.returncode != 0:
+            # Merge conflict occurred
+            return False
+            
+        # Push the merged branch back to the bare repo
+        subprocess.run(["git", "push", "origin", target_branch], cwd=temp_dir, check=True, capture_output=True)
+        return True
+    except Exception as e:
+        print(f"Merge error: {e}")
+        return False
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)

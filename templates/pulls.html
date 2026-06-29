@@ -1,0 +1,81 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'pulls' %}
+
+{% block repo_content %}
+<div class="mt-4">
+    <div class="flex justify-between items-center mb-4">
+        <div class="flex space-x-2">
+            <div class="bg-github-dark border border-github-border rounded-md flex overflow-hidden text-sm">
+                <button class="px-3 py-1 font-semibold text-white bg-github-header border-r border-github-border flex items-center">
+                    <i class="fa-solid fa-code-pull-request mr-1"></i>
+                    Open ({{ pulls | selectattr('status', 'equalto', 'Open') | list | length }})
+                </button>
+                <button class="px-3 py-1 font-semibold text-gray-400 flex items-center">
+                    <i class="fa-solid fa-check mr-1"></i>
+                    Merged ({{ pulls | selectattr('status', 'equalto', 'Merged') | list | length }})
+                </button>
+            </div>
+        </div>
+        {% if user %}
+        <a href="/{{ owner.username }}/{{ repo.name }}/pull/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1.5 px-3 rounded-md text-sm transition-colors shadow">
+            New pull request
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden">
+        <div class="bg-github-header border-b border-github-border px-4 py-3 flex items-center text-sm font-semibold text-gray-300">
+            <i class="fa-solid fa-code-pull-request text-gray-400 mr-2"></i> {{ pulls|length }} Pull Request{{ 's' if pulls|length != 1 else '' }}
+        </div>
+
+        <div class="divide-y divide-github-border">
+            {% for pr in pulls %}
+            <div class="p-4 hover:bg-gray-800/30 transition-colors flex items-start group">
+                <div class="mt-1 mr-3 flex-shrink-0">
+                    {% if pr.status == 'Open' %}
+                    <i class="fa-solid fa-code-pull-request text-github-green text-lg"></i>
+                    {% elif pr.status == 'Merged' %}
+                    <i class="fa-solid fa-code-merge text-purple-500 text-lg"></i>
+                    {% else %}
+                    <i class="fa-solid fa-code-pull-request text-red-500 text-lg"></i>
+                    {% endif %}
+                </div>
+                <div class="flex-1">
+                    <a href="/{{ owner.username }}/{{ repo.name }}/pull/{{ pr.id }}" class="text-white font-semibold text-base group-hover:text-github-blue">{{ pr.title }}</a>
+                    <div class="text-xs text-gray-500 mt-1">
+                        #{{ pr.id }}
+                        <span class="inline-flex items-center ml-1">
+                            <span class="font-mono bg-github-header border border-github-border rounded px-1 text-gray-400">{{ pr.source_branch }}</span>
+                            <i class="fa-solid fa-arrow-right mx-1"></i>
+                            <span class="font-mono bg-github-header border border-github-border rounded px-1 text-gray-400">{{ pr.target_branch }}</span>
+                        </span>
+                        &mdash; opened by <a href="/{{ pr.author.username }}" class="hover:text-github-blue">{{ pr.author.username }}</a>
+                        on {{ pr.created_at.strftime('%b %d, %Y') }}
+                    </div>
+                </div>
+                <div class="ml-4 flex-shrink-0">
+                    {% if pr.status == 'Open' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-900/50 text-green-400 border border-green-700">Open</span>
+                    {% elif pr.status == 'Merged' %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-900/50 text-purple-400 border border-purple-700">Merged</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/50 text-red-400 border border-red-700">Closed</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="p-12 text-center">
+                <i class="fa-solid fa-code-pull-request text-3xl text-gray-500 mb-4"></i>
+                <h3 class="text-xl font-semibold text-white mb-2">No pull requests yet</h3>
+                <p class="text-gray-400 mb-4">Pull requests help you collaborate on code changes.</p>
+                {% if user %}
+                <a href="/{{ owner.username }}/{{ repo.name }}/pull/new" class="bg-github-green hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md text-sm transition-colors">
+                    Create a pull request
+                </a>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
