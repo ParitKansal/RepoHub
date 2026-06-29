@@ -25,6 +25,7 @@ class Repository(Base):
     
     owner = relationship("User", back_populates="repositories")
     issues = relationship("Issue", back_populates="repository")
+    stars = relationship("Star", back_populates="repository")
 
 class Issue(Base):
     __tablename__ = "issues"
@@ -52,3 +53,14 @@ class Comment(Base):
     
     issue = relationship("Issue", back_populates="comments")
     author = relationship("User")
+
+class Star(Base):
+    __tablename__ = "stars"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    repo_id = Column(Integer, ForeignKey("repositories.id"))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    user = relationship("User")
+    repository = relationship("Repository", back_populates="stars")

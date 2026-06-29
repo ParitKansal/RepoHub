@@ -1,5 +1,7 @@
 import os
-from fastapi import FastAPI, Depends, Request, Form, Response, status
+import re
+import markdown
+from fastapi import FastAPI, Request, Depends, Form, Cookie, status, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -126,6 +128,43 @@ async def search_repositories(request: Request, q: str = "", db: Session = Depen
         "results": results
     })
 
+@app.post("/{username}/{repo_name}/star", response_class=RedirectResponse)
+async def toggle_star(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    user = auth.get_current_user_from_cookie(request, db)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/", status_code=303)
+        
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return RedirectResponse(url="/", status_code=303)
+        
+    existing_star = db.query(models.Star).filter(
+        models.Star.user_id == user.id,
+        models.Star.repo_id == repo.id
+    ).first()
+    
+    if existing_star:
+        db.delete(existing_star)
+    else:
+        new_star = models.Star(user_id=user.id, repo_id=repo.id)
+        db.add(new_star)
+        
+    db.commit()
+    
+    # Redirect back to where they came from
+    referer = request.headers.get("referer")
+    if referer:
+        return RedirectResponse(url=referer, status_code=303)
+    return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
     user = auth.get_current_user_from_cookie(request, db)
@@ -226,12 +265,23 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
     is_empty = git_utils.is_repo_empty(repo_path)
     files = []
     latest_commit = None
+    readme_html = None
     
     if not is_empty:
         files = git_utils.get_repo_files(repo_path)
         commits = git_utils.get_repo_commits(repo_path, limit=1)
         if commits:
             latest_commit = commits[0]
+            
+        # Look for README.md
+        for file in files:
+            if file['name'].lower() == 'readme.md' and file['type'] == 'blob':
+                try:
+                    readme_content = git_utils.get_file_content(repo_path, file['name'])
+                    if readme_content:
+                        readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
+                except Exception:
+                    pass
 
     return templates.TemplateResponse(request=request, name="repo_detail.html", context={
         "user": current_user, 
@@ -239,7 +289,8 @@ async def repo_detail(request: Request, username: str, repo_name: str, db: Sessi
         "owner": owner,
         "is_empty": is_empty,
         "files": files,
-        "latest_commit": latest_commit
+        "latest_commit": latest_commit,
+        "readme_html": readme_html
     })
 
 @app.get("/{username}/{repo_name}/commits", response_class=HTMLResponse)
@@ -267,6 +318,52 @@ async def repo_commits(request: Request, username: str, repo_name: str, db: Sess
         "owner": owner,
         "commits": commits
     })
+
+@app.get("/{username}/{repo_name}/settings", response_class=HTMLResponse)
+async def repo_settings(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    current_user = auth.get_current_user_from_cookie(request, db)
+    if not current_user or current_user.username != username:
+        return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return RedirectResponse(url="/", status_code=303)
+        
+    return templates.TemplateResponse(request=request, name="settings.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner
+    })
+
+@app.post("/{username}/{repo_name}/delete", response_class=RedirectResponse)
+async def delete_repo(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
+    current_user = auth.get_current_user_from_cookie(request, db)
+    if not current_user or current_user.username != username:
+        return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if repo:
+        # Delete from db
+        db.delete(repo)
+        db.commit()
+        
+        # Delete from disk
+        import shutil
+        repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+        if os.path.exists(repo_path):
+            shutil.rmtree(repo_path)
+            
+    return RedirectResponse(url="/dashboard", status_code=303)
 
 @app.get("/{username}/{repo_name}/blob/{filepath:path}", response_class=HTMLResponse)
 async def repo_blob(request: Request, username: str, repo_name: str, filepath: str, db: Session = Depends(get_db)):

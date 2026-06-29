@@ -69,9 +69,21 @@
                         </div>
                         
                         <div class="flex items-center space-x-2">
-                            <button class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 px-3 py-1 rounded-md text-xs font-semibold flex items-center space-x-2 transition-colors">
-                                <i class="fa-regular fa-star"></i> <span>Star</span>
-                            </button>
+                            <form action="/{{ user.username }}/{{ repo.name }}/star" method="POST" class="inline">
+                                <button type="submit" class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 px-3 py-1 rounded-md text-xs font-semibold flex items-center transition-colors">
+                                    {% set starred = namespace(value=false) %}
+                                    {% for s in repo.stars %}
+                                        {% if s.user_id == user.id %}
+                                            {% set starred.value = true %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if starred.value %}
+                                    <i class="fa-solid fa-star text-yellow-500 mr-2"></i> <span>Starred</span>
+                                    {% else %}
+                                    <i class="fa-regular fa-star mr-2"></i> <span>Star</span>
+                                    {% endif %}
+                                </button>
+                            </form>
                         </div>
                     </div>
                     {% endfor %}
