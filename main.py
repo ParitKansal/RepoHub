@@ -237,6 +237,35 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
         "content": content
     })
 
+@app.get("/{username}/{repo_name}/commit/{commit_hash}", response_class=HTMLResponse)
+async def commit_detail(request: Request, username: str, repo_name: str, commit_hash: str, db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return RedirectResponse(url="/dashboard")
+        
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    if not repo:
+        return RedirectResponse(url="/dashboard")
+        
+    repo_path = os.path.join(REPOS_DIR, username, repo_name + ".git")
+    commit_data = git_utils.get_commit_details(repo_path, commit_hash)
+    
+    if not commit_data:
+        return RedirectResponse(url=f"/{username}/{repo_name}/commits")
+        
+    current_user = auth.get_current_user_from_cookie(request, db)
+    
+    return templates.TemplateResponse(request=request, name="commit_detail.html", context={
+        "user": current_user, 
+        "repo": repo, 
+        "owner": owner,
+        "commit": commit_data
+    })
+
 @app.get("/{username}/{repo_name}/issues", response_class=HTMLResponse)
 async def repo_issues(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
     owner = db.query(models.User).filter(models.User.username == username).first()

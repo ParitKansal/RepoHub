@@ -18,9 +18,9 @@
                 
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between mb-1">
-                        <h4 class="text-white font-semibold text-sm hover:text-github-blue cursor-pointer truncate mr-4">{{ commit.message }}</h4>
+                        <a href="/{{ owner.username }}/{{ repo.name }}/commit/{{ commit.hash }}" class="text-white font-semibold text-sm hover:text-github-blue cursor-pointer truncate mr-4 block">{{ commit.message }}</a>
                         <div class="flex items-center space-x-2">
-                            <span class="text-xs font-mono bg-github-header border border-github-border text-github-blue px-2 py-1 rounded truncate w-24 text-center">{{ commit.hash[:7] }}</span>
+                            <a href="/{{ owner.username }}/{{ repo.name }}/commit/{{ commit.hash }}" class="text-xs font-mono bg-github-header border border-github-border text-github-blue hover:text-white px-2 py-1 rounded truncate w-24 text-center transition-colors">{{ commit.hash[:7] }}</a>
                             <button class="bg-github-header border border-github-border text-gray-400 hover:text-white px-2 py-1 rounded" title="Browse files at this point in history">
                                 <i class="fa-solid fa-code"></i>
                             </button>
