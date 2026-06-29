@@ -369,3 +369,70 @@ async def issue_detail(request: Request, username: str, repo_name: str, issue_id
         "owner": owner,
         "issue": issue
     })
+
+@app.post("/{username}/{repo_name}/issues/{issue_id}/comment")
+async def add_issue_comment(
+    request: Request, 
+    username: str, 
+    repo_name: str, 
+    issue_id: int, 
+    content: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    current_user = auth.get_current_user_from_cookie(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login")
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
+    if not issue:
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues")
+        
+    new_comment = models.Comment(
+        content=content,
+        issue_id=issue.id,
+        author_id=current_user.id
+    )
+    db.add(new_comment)
+    db.commit()
+    
+    return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}", status_code=status.HTTP_302_FOUND)
+
+@app.post("/{username}/{repo_name}/issues/{issue_id}/close")
+async def close_issue(
+    request: Request, 
+    username: str, 
+    repo_name: str, 
+    issue_id: int, 
+    db: Session = Depends(get_db)
+):
+    current_user = auth.get_current_user_from_cookie(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login")
+        
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id, 
+        models.Repository.name == repo_name
+    ).first()
+    
+    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
+    if not issue:
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues")
+        
+    # Only repo owner or issue author can close it
+    if current_user.id != owner.id and current_user.id != issue.author_id:
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}")
+        
+    if issue.status == "Open":
+        issue.status = "Closed"
+    else:
+        issue.status = "Open"
+        
+    db.commit()
+    return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}", status_code=status.HTTP_302_FOUND)

@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime
+from sqlalchemy.orm import relationship
+import datetime
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -34,4 +36,18 @@ class Issue(Base):
     author_id = Column(Integer, ForeignKey("users.id"))
     
     repository = relationship("Repository", back_populates="issues")
+    author = relationship("User")
+    comments = relationship("Comment", back_populates="issue")
+
+class Comment(Base):
+    __tablename__ = "comments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    issue_id = Column(Integer, ForeignKey("issues.id"))
+    author_id = Column(Integer, ForeignKey("users.id"))
+    
+    issue = relationship("Issue", back_populates="comments")
     author = relationship("User")
