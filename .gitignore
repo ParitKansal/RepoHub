@@ -26,6 +26,7 @@ htmlcov/
 .venv
 venv/
 ENV/
+plan.md
 
 # Repositories data directory (we don't want to track user repositories in our app's git repo)
 /repos/

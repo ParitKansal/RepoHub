@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid">
+    <div>
+        <h2>Dashboard</h2>
+        <p>Welcome back, <strong>{{ user.username }}</strong>!</p>
+    </div>
+</div>
+
+<article>
+    <header>Your Repositories</header>
+    {% if repositories %}
+        <ul>
+        {% for repo in repositories %}
+            <li><strong>{{ repo.name }}</strong>: {{ repo.description }}</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>You don't have any repositories yet. (Repository creation coming in Phase 2!)</p>
+    {% endif %}
+</article>
+{% endblock %}
