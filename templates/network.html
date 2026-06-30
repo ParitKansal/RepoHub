@@ -208,11 +208,11 @@
         });
 
         /* ── Edges ── */
-        // For same-lane edges: straight vertical in the commit's lane color.
-        // For cross-lane edges (always a merge/diverge): curve immediately from
-        // the commit's position into the PARENT's lane within one row, then
-        // stay vertical in the parent's lane. Color by parent lane — each branch
-        // line is consistently its own color the whole way down.
+        // Draw edges BEHIND circles. For cross-lane edges we "stay in lane"
+        // (vertical segment) all the way down, then make a short curve into the
+        // parent's lane in the final row-gap. This prevents long arcing lines
+        // from fanning across the whole graph when multiple branches share a
+        // common ancestor.
         commits.forEach((commit, ri) => {
             commit.parents.forEach(ph => {
                 const pi = indexOf[ph];
@@ -220,31 +220,38 @@
                 const parent = commits[pi];
                 const x1 = cx(commit.lane), y1 = cy(ri);
                 const x2 = cx(parent.lane), y2 = cy(pi);
+                const color = laneColor[commit.lane] || COLORS[0];
 
                 if (commit.lane === parent.lane) {
-                    const color = laneColor[commit.lane] || COLORS[0];
+                    // Same lane → straight vertical line
                     g.append('line')
                         .attr('x1', x1).attr('y1', y1 + R + 1)
                         .attr('x2', x2).attr('y2', y2 - R - 1)
                         .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
                 } else {
-                    // Color by the PARENT's lane (the branch line being connected)
-                    const color = laneColor[parent.lane] || COLORS[0];
-                    const c1    = ROW_H * 0.5;
-                    // Curve completes within 1 row below the commit so the rest
-                    // of the vertical rail is a clean straight line in parent's lane
-                    const exitY = y1 + ROW_H * 0.85;
+                    // Different lane:
+                    //  1. Stay vertical in the child's lane until one row above parent
+                    //  2. Short S-curve into the parent's lane
+                    const junctionY = y2 - ROW_H;          // one row above parent
+                    const c1 = ROW_H * 0.55;               // bezier ctrl-pt offsets
 
-                    g.append('path')
-                        .attr('d', `M${x1},${y1 + R} C${x1},${y1 + c1} ${x2},${exitY - c1} ${x2},${exitY}`)
-                        .attr('fill', 'none')
-                        .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
-
-                    // Vertical rail in parent's lane for remaining distance
-                    if (exitY + 2 < y2 - R) {
+                    if (junctionY > y1 + R + 4) {
+                        // Vertical rail segment
                         g.append('line')
-                            .attr('x1', x2).attr('y1', exitY)
-                            .attr('x2', x2).attr('y2', y2 - R - 1)
+                            .attr('x1', x1).attr('y1', y1 + R + 1)
+                            .attr('x2', x1).attr('y2', junctionY)
+                            .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
+
+                        // Short curve from junction into parent circle
+                        g.append('path')
+                            .attr('d', `M${x1},${junctionY} C${x1},${junctionY + c1} ${x2},${y2 - c1} ${x2},${y2 - R}`)
+                            .attr('fill', 'none')
+                            .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
+                    } else {
+                        // Adjacent rows — just a short S-curve the whole way
+                        g.append('path')
+                            .attr('d', `M${x1},${y1 + R} C${x1},${y1 + c1} ${x2},${y2 - c1} ${x2},${y2 - R}`)
+                            .attr('fill', 'none')
                             .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
                     }
                 }
