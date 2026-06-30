@@ -269,6 +269,73 @@ Open http://localhost:8000.
 
 ---
 
+## Production Infrastructure
+
+The live instance at **https://parit-gitclone.duckdns.org:8443** runs on Google Cloud Platform.
+
+### Host VM
+
+| Property | Value |
+|---|---|
+| Provider | Google Cloud Platform |
+| Instance | `instance-20260630-063832` |
+| Zone | `us-central1-b` |
+| vCPUs | 2× AMD EPYC 7B12 |
+| RAM | 955 MB (no swap) |
+| Boot disk | 8.7 GB (51% used) |
+| OS | Ubuntu (latest LTS) |
+
+### Running Containers
+
+| Container | Image | Ports | Memory |
+|---|---|---|---|
+| `repohub-nginx-1` | `nginx:alpine` | `0.0.0.0:8080→80`, `0.0.0.0:8443→443` | ~4 MB |
+| `repohub-web-1` | `repohub-web` (local build) | `8000` (internal) | ~333 MB |
+| `repohub-postgres-1` | `postgres:15` | `5432` (internal) | ~33 MB |
+
+All three containers have been running continuously since deployment. Startup order: Postgres (with healthcheck) → web → nginx.
+
+### Docker Volumes
+
+| Volume | Purpose |
+|---|---|
+| `pgdata` | PostgreSQL data directory (persisted across restarts) |
+| `repos-data` | Bare git repositories (`/repos` inside the web container) |
+
+### Nginx Configuration
+
+- Port **8080** (HTTP) — redirects all traffic to HTTPS via `301`
+- Port **8443** (HTTPS) — TLS termination with self-signed certificate
+- TLS protocols: **TLSv1.2 and TLSv1.3** only
+- `/static/` — served directly by Nginx with `Cache-Control: public, 30d`
+- All other requests — proxied to `http://web:8000` with forwarded headers (`X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`)
+
+### Web Service
+
+- **Command:** `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4`
+- **Templates:** mounted from `./frontend` into `/app/frontend` inside the container
+- **Repos dir:** Docker volume `repos-data` mounted at `/repos`
+- **Logs:** `json-file` driver, max 10 MB × 3 files per service
+
+### Resource Usage (live snapshot)
+
+```
+CONTAINER              CPU %    MEM USAGE / LIMIT       MEM %
+repohub-web-1          1.28%    332.6 MiB / 955.5 MiB   34.80%
+repohub-postgres-1     0.00%    33.5  MiB / 955.5 MiB    3.50%
+repohub-nginx-1        0.00%    4.1   MiB / 955.5 MiB    0.43%
+```
+
+> **Note:** The VM has no swap configured. If a memory spike occurs (e.g. large `git merge`), the OOM killer may terminate a container. Consider adding swap or upgrading to a larger instance type for production workloads.
+
+### Capacity Limits
+
+- **Disk:** 4.3 GB remaining — adequate for small-to-medium usage; monitor as repositories grow
+- **RAM:** ~145 MB available headroom — sufficient for light traffic; spikes during concurrent git operations may cause OOM
+- **Network:** Standard GCP egress billing applies
+
+---
+
 ## Security Notes
 
 - Passwords are hashed with bcrypt via passlib.
