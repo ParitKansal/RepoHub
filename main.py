@@ -1,17 +1,23 @@
 import os
 import re
+import shutil
 import markdown
-from fastapi import FastAPI, Request, Depends, Form, Cookie, status, Response
+from fastapi import FastAPI, Request, Depends, Form, status, Response
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import models
 import database
 import auth
 import git_utils
+from dependencies import (
+    REPOS_DIR,
+    get_repo_path,
+    require_login,
+    lookup_repo_context,
+    validate_branch,
+)
 
-REPOS_DIR = "./repos"
 os.makedirs(REPOS_DIR, exist_ok=True)
 
 # Create database tables
@@ -129,31 +135,23 @@ async def search_repositories(request: Request, q: str = "", db: Session = Depen
 
 @app.post("/{username}/{repo_name}/star", response_class=RedirectResponse)
 async def toggle_star(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
-    user = auth.get_current_user_from_cookie(request, db)
+    user = require_login(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/", status_code=303)
-        
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
-        return RedirectResponse(url="/", status_code=303)
-        
+
     existing_star = db.query(models.Star).filter(
         models.Star.user_id == user.id,
-        models.Star.repo_id == repo.id
+        models.Star.repo_id == ctx.repo.id
     ).first()
     
     if existing_star:
         db.delete(existing_star)
     else:
-        new_star = models.Star(user_id=user.id, repo_id=repo.id)
+        new_star = models.Star(user_id=user.id, repo_id=ctx.repo.id)
         db.add(new_star)
         
     db.commit()
@@ -166,7 +164,7 @@ async def toggle_star(request: Request, username: str, repo_name: str, db: Sessi
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
-    user = auth.get_current_user_from_cookie(request, db)
+    user = require_login(request, db)
     if not user:
         return RedirectResponse(url="/login")
     
@@ -197,7 +195,7 @@ async def user_profile(request: Request, username: str, db: Session = Depends(ge
 
 @app.get("/repo/new", response_class=HTMLResponse)
 async def new_repo_get(request: Request, db: Session = Depends(get_db)):
-    user = auth.get_current_user_from_cookie(request, db)
+    user = require_login(request, db)
     if not user:
         return RedirectResponse(url="/login")
     return templates.TemplateResponse(request=request, name="new_repo.html", context={"user": user})
@@ -210,7 +208,7 @@ async def new_repo_post(
     visibility: str = Form("public"),
     db: Session = Depends(get_db)
 ):
-    user = auth.get_current_user_from_cookie(request, db)
+    user = require_login(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
         
@@ -243,25 +241,12 @@ async def new_repo_post(
 
 @app.get("/{username}/{repo_name}", response_class=HTMLResponse)
 async def repo_detail(request: Request, username: str, repo_name: str, branch: str = "main", db: Session = Depends(get_db)):
-    # Look up the owner
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
-    # Look up the repo
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
-    
-    is_empty = git_utils.is_repo_empty(repo_path)
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
+    is_empty = git_utils.is_repo_empty(ctx.repo_path)
     files = []
     latest_commit = None
     readme_html = None
@@ -269,12 +254,10 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
 
     contributors = []
     if not is_empty:
-        branches = git_utils.get_branches(repo_path)
-        if branch not in branches and branches:
-            branch = branches[0]
+        branch, branches = validate_branch(ctx.repo_path, branch)
             
-        files = git_utils.get_repo_files(repo_path, branch=branch)
-        commits = git_utils.get_repo_commits(repo_path, limit=1, branch=branch)
+        files = git_utils.get_repo_files(ctx.repo_path, branch=branch)
+        commits = git_utils.get_repo_commits(ctx.repo_path, limit=1, branch=branch)
         if commits:
             latest_commit = commits[0]
             
@@ -282,18 +265,18 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
         for file in files:
             if file['name'].lower() == 'readme.md' and file['type'] == 'blob':
                 try:
-                    readme_content = git_utils.get_file_content(repo_path, file['name'], branch=branch)
+                    readme_content = git_utils.get_file_content(ctx.repo_path, file['name'], branch=branch)
                     if readme_content:
                         readme_html = markdown.markdown(readme_content, extensions=['fenced_code', 'tables'])
                 except Exception:
                     pass
         
-        contributors = git_utils.get_contributors(repo_path)
+        contributors = git_utils.get_contributors(ctx.repo_path)
 
     return templates.TemplateResponse(request=request, name="repo_detail.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "is_empty": is_empty,
         "files": files,
         "latest_commit": latest_commit,
@@ -305,35 +288,22 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
 
 @app.get("/{username}/{repo_name}/commits", response_class=HTMLResponse)
 async def repo_commits(request: Request, username: str, repo_name: str, branch: str = "main", db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
-    
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
     commits = []
     branches = []
     
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
-        if branch not in branches and branches:
-            branch = branches[0]
-        commits = git_utils.get_repo_commits(repo_path, limit=50, branch=branch)
+    if not git_utils.is_repo_empty(ctx.repo_path):
+        branch, branches = validate_branch(ctx.repo_path, branch)
+        commits = git_utils.get_repo_commits(ctx.repo_path, limit=50, branch=branch)
         
     return templates.TemplateResponse(request=request, name="commits.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "commits": commits,
         "branches": branches,
         "current_branch": branch
@@ -341,142 +311,94 @@ async def repo_commits(request: Request, username: str, repo_name: str, branch: 
 
 @app.get("/{username}/{repo_name}/branches", response_class=HTMLResponse)
 async def repo_branches(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
     branches = []
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not git_utils.is_repo_empty(ctx.repo_path):
+        branches = git_utils.get_branches(ctx.repo_path)
         
     return templates.TemplateResponse(request=request, name="branches.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "branches": branches
     })
 
 @app.get("/{username}/{repo_name}/network", response_class=HTMLResponse)
 async def repo_network(request: Request, username: str, repo_name: str, branch: str = "__all__", db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
 
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id,
-        models.Repository.name == repo_name
-    ).first()
-
-    current_user = auth.get_current_user_from_cookie(request, db)
-
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
     branches = []
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not git_utils.is_repo_empty(ctx.repo_path):
+        branches = git_utils.get_branches(ctx.repo_path)
 
     return templates.TemplateResponse(request=request, name="network.html", context={
-        "user": current_user,
-        "repo": repo,
-        "owner": owner,
+        "user": ctx.current_user,
+        "repo": ctx.repo,
+        "owner": ctx.owner,
         "branches": branches,
         "current_branch": branch
     })
 
 @app.get("/{username}/{repo_name}/graph-data")
 async def repo_graph_data(request: Request, username: str, repo_name: str, branch: str = "__all__", db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return JSONResponse({"error": "User not found"}, status_code=404)
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        return JSONResponse({"error": error}, status_code=404)
 
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id,
-        models.Repository.name == repo_name
-    ).first()
-
-    current_user = auth.get_current_user_from_cookie(request, db)
-
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return JSONResponse({"error": "Repository not found"}, status_code=404)
-
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
-    if git_utils.is_repo_empty(repo_path):
+    if git_utils.is_repo_empty(ctx.repo_path):
         return JSONResponse({"commits": [], "branch_tips": {}})
 
-    commits = git_utils.get_commit_graph(repo_path, branch, limit=80)
-    branch_tips = git_utils.get_branch_tips(repo_path)
+    commits = git_utils.get_commit_graph(ctx.repo_path, branch, limit=80)
+    branch_tips = git_utils.get_branch_tips(ctx.repo_path)
     return JSONResponse({"commits": commits, "branch_tips": branch_tips})
 
 @app.get("/{username}/{repo_name}/pulls", response_class=HTMLResponse)
 async def repo_pulls(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-    
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    pulls = db.query(models.PullRequest).filter(models.PullRequest.repo_id == repo.id).order_by(models.PullRequest.created_at.desc()).all()
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
+    pulls = db.query(models.PullRequest).filter(models.PullRequest.repo_id == ctx.repo.id).order_by(models.PullRequest.created_at.desc()).all()
     
     return templates.TemplateResponse(request=request, name="pulls.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "pulls": pulls
     })
 
 @app.get("/{username}/{repo_name}/pull/new", response_class=HTMLResponse)
 async def new_pull_get(request: Request, username: str, repo_name: str, base: str = "main", compare: str = "", db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-    
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
     branches = []
     diff_files = []
     
-    if not git_utils.is_repo_empty(repo_path):
-        branches = git_utils.get_branches(repo_path)
+    if not git_utils.is_repo_empty(ctx.repo_path):
+        branches = git_utils.get_branches(ctx.repo_path)
         if not compare and len(branches) > 1:
             compare = branches[1] if branches[1] != base else branches[0]
         elif not compare:
             compare = base
             
         if base in branches and compare in branches and base != compare:
-            diff_files = git_utils.get_branch_diff(repo_path, base, compare)
+            diff_files = git_utils.get_branch_diff(ctx.repo_path, base, compare)
             
     return templates.TemplateResponse(request=request, name="new_pull.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "branches": branches,
         "base": base,
         "compare": compare,
@@ -494,25 +416,20 @@ async def new_pull_post(
     compare: str = Form(...), 
     db: Session = Depends(get_db)
 ):
-    current_user = auth.get_current_user_from_cookie(request, db)
+    current_user = require_login(request, db)
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/", status_code=303)
-        
+
     new_pr = models.PullRequest(
         title=title,
         description=description,
         source_branch=compare,
         target_branch=base,
-        repo_id=repo.id,
+        repo_id=ctx.repo.id,
         author_id=current_user.id
     )
     db.add(new_pr)
@@ -522,35 +439,26 @@ async def new_pull_post(
 
 @app.get("/{username}/{repo_name}/pull/{pr_id}", response_class=HTMLResponse)
 async def pull_detail(request: Request, username: str, repo_name: str, pr_id: int, db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-    
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    pr = db.query(models.PullRequest).filter(models.PullRequest.id == pr_id, models.PullRequest.repo_id == repo.id).first()
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
+    pr = db.query(models.PullRequest).filter(models.PullRequest.id == pr_id, models.PullRequest.repo_id == ctx.repo.id).first()
     if not pr:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Pull Request not found", "user": current_user})
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Pull Request not found", "user": ctx.current_user})
+
     diff_files = []
     can_merge = False
     
-    if not git_utils.is_repo_empty(repo_path):
-        diff_files = git_utils.get_branch_diff(repo_path, pr.target_branch, pr.source_branch)
+    if not git_utils.is_repo_empty(ctx.repo_path):
+        diff_files = git_utils.get_branch_diff(ctx.repo_path, pr.target_branch, pr.source_branch)
         if pr.status == "Open":
             try:
                 import subprocess
-                mb = subprocess.run(["git", "merge-base", pr.target_branch, pr.source_branch], cwd=repo_path, capture_output=True, text=True)
+                mb = subprocess.run(["git", "merge-base", pr.target_branch, pr.source_branch], cwd=ctx.repo_path, capture_output=True, text=True)
                 if mb.returncode == 0:
-                    mt = subprocess.run(["git", "merge-tree", mb.stdout.strip(), pr.target_branch, pr.source_branch], cwd=repo_path, capture_output=True)
+                    mt = subprocess.run(["git", "merge-tree", mb.stdout.strip(), pr.target_branch, pr.source_branch], cwd=ctx.repo_path, capture_output=True)
                     can_merge = (mt.returncode == 0)
                 else:
                     can_merge = False
@@ -558,9 +466,9 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
                 can_merge = True
         
     return templates.TemplateResponse(request=request, name="pull_detail.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "pr": pr,
         "diff_files": diff_files,
         "can_merge": can_merge
@@ -568,27 +476,20 @@ async def pull_detail(request: Request, username: str, repo_name: str, pr_id: in
 
 @app.post("/{username}/{repo_name}/pull/{pr_id}/merge", response_class=RedirectResponse)
 async def pull_merge(request: Request, username: str, repo_name: str, pr_id: int, db: Session = Depends(get_db)):
-    current_user = auth.get_current_user_from_cookie(request, db)
+    current_user = require_login(request, db)
     if not current_user:
         return RedirectResponse(url="/login", status_code=303)
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/", status_code=303)
-        
-    pr = db.query(models.PullRequest).filter(models.PullRequest.id == pr_id, models.PullRequest.repo_id == repo.id).first()
+
+    pr = db.query(models.PullRequest).filter(models.PullRequest.id == pr_id, models.PullRequest.repo_id == ctx.repo.id).first()
     if not pr or pr.status != "Open":
         return RedirectResponse(url=f"/{username}/{repo_name}/pulls", status_code=303)
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
-    
+
     success = git_utils.merge_branches(
-        repo_path, 
+        ctx.repo_path, 
         pr.target_branch, 
         pr.source_branch, 
         current_user.username, 
@@ -603,31 +504,26 @@ async def pull_merge(request: Request, username: str, repo_name: str, pr_id: int
 
 @app.get("/{username}/{repo_name}/settings", response_class=HTMLResponse)
 async def repo_settings(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
-    current_user = auth.get_current_user_from_cookie(request, db)
+    current_user = require_login(request, db)
     if not current_user or current_user.username != username:
         return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/", status_code=303)
-        
+
     return templates.TemplateResponse(request=request, name="settings.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner
     })
 
 @app.post("/{username}/{repo_name}/delete", response_class=RedirectResponse)
 async def delete_repo(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
-    current_user = auth.get_current_user_from_cookie(request, db)
+    current_user = require_login(request, db)
     if not current_user or current_user.username != username:
         return RedirectResponse(url=f"/{username}/{repo_name}", status_code=303)
-        
+
     owner = db.query(models.User).filter(models.User.username == username).first()
     repo = db.query(models.Repository).filter(
         models.Repository.owner_id == owner.id, 
@@ -640,8 +536,7 @@ async def delete_repo(request: Request, username: str, repo_name: str, db: Sessi
         db.commit()
         
         # Delete from disk
-        import shutil
-        repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+        repo_path = get_repo_path(owner.username, repo.name)
         if os.path.exists(repo_path):
             shutil.rmtree(repo_path)
             
@@ -649,32 +544,18 @@ async def delete_repo(request: Request, username: str, repo_name: str, db: Sessi
 
 @app.get("/{username}/{repo_name}/blob/{filepath:path}", response_class=HTMLResponse)
 async def repo_blob(request: Request, username: str, repo_name: str, filepath: str, branch: str = "main", db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
-    
-    branches = git_utils.get_branches(repo_path)
-    if branch not in branches and branches:
-        branch = branches[0]
-        
-    content = git_utils.get_file_content(repo_path, filepath, branch=branch)
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
+    branch, _ = validate_branch(ctx.repo_path, branch)
+    content = git_utils.get_file_content(ctx.repo_path, filepath, branch=branch)
     
     return templates.TemplateResponse(request=request, name="file_view.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "filepath": filepath,
         "content": content,
         "current_branch": branch
@@ -682,64 +563,44 @@ async def repo_blob(request: Request, username: str, repo_name: str, filepath: s
 
 @app.get("/{username}/{repo_name}/commit/{commit_hash}", response_class=HTMLResponse)
 async def commit_detail(request: Request, username: str, repo_name: str, commit_hash: str, db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not user or user.id != owner.id)):
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/", status_code=303)
-        
-    repo_path = os.path.join(REPOS_DIR, username, repo_name + ".git")
-    commit_data = git_utils.get_commit_details(repo_path, commit_hash)
+
+    commit_data = git_utils.get_commit_details(ctx.repo_path, commit_hash)
     
     if not commit_data:
         return RedirectResponse(url=f"/{username}/{repo_name}/commits")
-        
-    
+
     return templates.TemplateResponse(request=request, name="commit_detail.html", context={
-        "user": user,
-        "repo": repo,
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "commit": commit_data
     })
 
 @app.get("/{username}/{repo_name}/issues", response_class=HTMLResponse)
 async def repo_issues(request: Request, username: str, repo_name: str, state: str = "open", db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    if not owner:
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
-        
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        current_user = auth.get_current_user_from_cookie(request, db)
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": error, "user": current_user})
+
+    open_count = db.query(models.Issue).filter(models.Issue.repo_id == ctx.repo.id, models.Issue.status == "Open").count()
+    closed_count = db.query(models.Issue).filter(models.Issue.repo_id == ctx.repo.id, models.Issue.status == "Closed").count()
     
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
-    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
-        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
-        
-    open_count = db.query(models.Issue).filter(models.Issue.repo_id == repo.id, models.Issue.status == "Open").count()
-    closed_count = db.query(models.Issue).filter(models.Issue.repo_id == repo.id, models.Issue.status == "Closed").count()
-    
-    query = db.query(models.Issue).filter(models.Issue.repo_id == repo.id)
+    query = db.query(models.Issue).filter(models.Issue.repo_id == ctx.repo.id)
     if state.lower() == "closed":
         query = query.filter(models.Issue.status == "Closed")
     else:
         query = query.filter(models.Issue.status == "Open")
         
     issues = query.all()
-    current_user = auth.get_current_user_from_cookie(request, db)
     
     return templates.TemplateResponse(request=request, name="issues.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "issues": issues,
         "state": state.lower(),
         "open_count": open_count,
@@ -748,23 +609,18 @@ async def repo_issues(request: Request, username: str, repo_name: str, state: st
 
 @app.get("/{username}/{repo_name}/issues/new", response_class=HTMLResponse)
 async def new_issue_get(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):
-    user = auth.get_current_user_from_cookie(request, db)
+    user = require_login(request, db)
     if not user:
         return RedirectResponse(url="/login")
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/dashboard")
-        
+
     return templates.TemplateResponse(request=request, name="new_issue.html", context={
         "user": user, 
-        "repo": repo, 
-        "owner": owner
+        "repo": ctx.repo, 
+        "owner": ctx.owner
     })
 
 @app.post("/{username}/{repo_name}/issues/new")
@@ -776,23 +632,18 @@ async def new_issue_post(
     description: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    user = auth.get_current_user_from_cookie(request, db)
+    user = require_login(request, db)
     if not user:
         return RedirectResponse(url="/login")
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/dashboard")
-        
+
     new_issue = models.Issue(
         title=title, 
         description=description, 
-        repo_id=repo.id, 
+        repo_id=ctx.repo.id, 
         author_id=user.id
     )
     db.add(new_issue)
@@ -803,25 +654,18 @@ async def new_issue_post(
 
 @app.get("/{username}/{repo_name}/issues/{issue_id}", response_class=HTMLResponse)
 async def issue_detail(request: Request, username: str, repo_name: str, issue_id: int, db: Session = Depends(get_db)):
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id if owner else False, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    if not repo:
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
         return RedirectResponse(url="/dashboard")
-        
-    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
+
+    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == ctx.repo.id).first()
     if not issue:
         return RedirectResponse(url=f"/{username}/{repo_name}/issues")
-        
-    current_user = auth.get_current_user_from_cookie(request, db)
-    
+
     return templates.TemplateResponse(request=request, name="issue_detail.html", context={
-        "user": current_user, 
-        "repo": repo, 
-        "owner": owner,
+        "user": ctx.current_user, 
+        "repo": ctx.repo, 
+        "owner": ctx.owner,
         "issue": issue
     })
 
@@ -834,17 +678,15 @@ async def add_issue_comment(
     content: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    current_user = auth.get_current_user_from_cookie(request, db)
+    current_user = require_login(request, db)
     if not current_user:
         return RedirectResponse(url="/login")
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues")
+
+    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == ctx.repo.id).first()
     if not issue:
         return RedirectResponse(url=f"/{username}/{repo_name}/issues")
         
@@ -866,22 +708,20 @@ async def close_issue(
     issue_id: int, 
     db: Session = Depends(get_db)
 ):
-    current_user = auth.get_current_user_from_cookie(request, db)
+    current_user = require_login(request, db)
     if not current_user:
         return RedirectResponse(url="/login")
-        
-    owner = db.query(models.User).filter(models.User.username == username).first()
-    repo = db.query(models.Repository).filter(
-        models.Repository.owner_id == owner.id, 
-        models.Repository.name == repo_name
-    ).first()
-    
-    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == repo.id).first()
+
+    ctx, error = lookup_repo_context(request, db, username, repo_name)
+    if error:
+        return RedirectResponse(url=f"/{username}/{repo_name}/issues")
+
+    issue = db.query(models.Issue).filter(models.Issue.id == issue_id, models.Issue.repo_id == ctx.repo.id).first()
     if not issue:
         return RedirectResponse(url=f"/{username}/{repo_name}/issues")
         
     # Only repo owner or issue author can close it
-    if current_user.id != owner.id and current_user.id != issue.author_id:
+    if current_user.id != ctx.owner.id and current_user.id != issue.author_id:
         return RedirectResponse(url=f"/{username}/{repo_name}/issues/{issue_id}")
         
     if issue.status == "Open":
