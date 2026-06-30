@@ -190,13 +190,10 @@
                 laneColor[c.lane] = laneToColor(c.lane);
         });
 
-        // main/master is always blue regardless of which lane it landed in
+        // Force main/master to blue only when it's actually present in the graph
         const mainHash = branchTips['main'] || branchTips['master'];
         if (mainHash && indexOf[mainHash] !== undefined) {
             laneColor[commits[indexOf[mainHash]].lane] = MAIN_BLUE;
-        } else {
-            // Fallback: topo-order always puts main's newest commit first → lane 0
-            laneColor[0] = MAIN_BLUE;
         }
 
         /* ── SVG geometry ── */
@@ -345,14 +342,32 @@
         });
 
         /* ── Legend ── */
+        // Build reverse map: lane → branch name (tip commit that owns this lane)
+        // A branch "owns" a lane only if its tip commit is the first commit seen
+        // in that lane — prevents two branches sharing a linear chain from both
+        // appearing in the legend with the same color.
+        const laneOwner = {};  // lane → branch name
+        commits.forEach(c => {
+            if (laneOwner[c.lane] === undefined) {
+                // Find if any branch tip is exactly this commit
+                for (const [name, hash] of Object.entries(branchTips)) {
+                    if (hash === c.hash) { laneOwner[c.lane] = name; break; }
+                }
+            }
+        });
+
         const legendEl = document.getElementById('legend');
-        const seenBranches = new Set();
+        const seenLanes = new Set();
         Object.entries(branchTips).forEach(([name, hash]) => {
             const idx = indexOf[hash];
             if (idx === undefined) return;
-            const color = laneColor[commits[idx].lane] || laneToColor(0);
-            if (seenBranches.has(name)) return;
-            seenBranches.add(name);
+            const lane = commits[idx].lane;
+            // Only show one legend entry per lane, and only if this branch tip
+            // is the first (topmost) commit in its lane
+            if (seenLanes.has(lane)) return;
+            if (laneOwner[lane] !== name) return;
+            seenLanes.add(lane);
+            const color = laneColor[lane] || laneToColor(lane);
             const span = document.createElement('span');
             span.className = 'flex items-center gap-1.5';
             span.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
