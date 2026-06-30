@@ -96,6 +96,7 @@
             {% endfor %}
             
             <!-- Add Comment Box -->
+            {% if user %}
             <div class="flex items-start space-x-4 mt-8 pt-8 border-t border-github-border">
                 <div class="hidden sm:block flex-shrink-0">
                     <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-lg text-white font-bold">
@@ -109,7 +110,7 @@
                             <button type="submit" class="bg-github-green hover:bg-green-600 text-white font-semibold py-1.5 px-3 rounded-md text-sm">Comment</button>
                         </div>
                     </form>
-                    
+
                     <form action="/{{ owner.username }}/{{ repo.name }}/issues/{{ issue.id }}/close" method="POST" class="mt-4 flex justify-end">
                         {% if issue.status == 'Open' %}
                         <button type="submit" class="bg-github-dark border border-github-border hover:bg-gray-800 text-gray-300 font-semibold py-1.5 px-3 rounded-md text-sm flex items-center">
@@ -123,6 +124,11 @@
                     </form>
                 </div>
             </div>
+            {% else %}
+            <div class="mt-8 pt-8 border-t border-github-border text-center text-gray-500 text-sm">
+                <a href="/login" class="text-github-blue hover:underline">Sign in</a> to leave a comment.
+            </div>
+            {% endif %}
         </div>
         
         <!-- Sidebar -->

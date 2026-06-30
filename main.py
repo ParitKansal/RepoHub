@@ -10,7 +10,6 @@ import models
 import database
 import auth
 import git_utils
-import re
 
 REPOS_DIR = "./repos"
 os.makedirs(REPOS_DIR, exist_ok=True)
@@ -266,7 +265,8 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
     files = []
     latest_commit = None
     readme_html = None
-    
+    branches = []
+
     contributors = []
     if not is_empty:
         branches = git_utils.get_branches(repo_path)
@@ -298,7 +298,7 @@ async def repo_detail(request: Request, username: str, repo_name: str, branch: s
         "files": files,
         "latest_commit": latest_commit,
         "readme_html": readme_html,
-        "branches": git_utils.get_branches(repo_path) if not is_empty else [],
+        "branches": branches,
         "current_branch": branch,
         "contributors": contributors
     })

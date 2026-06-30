@@ -58,7 +58,7 @@ def get_repo_commits(repo_path: str, limit: int = 20, branch: str = "main") -> l
         
     try:
         result = subprocess.run(
-            ["git", "log", branch, f"-n {limit}", "--pretty=format:%H|%an|%ar|%s"],
+            ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%an|%ar|%s"],
             cwd=repo_path,
             check=True,
             capture_output=True,
