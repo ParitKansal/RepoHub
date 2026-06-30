@@ -344,9 +344,3 @@ repohub-nginx-1        0.00%    4.1   MiB / 955.5 MiB    0.43%
 - Per-IP rate limiting is applied globally via SlowAPI.
 - Private repositories are invisible to unauthenticated users and other users.
 - Git HTTP transport requires Basic auth credentials for push; public repos allow anonymous clone.
-
----
-
-## License
-
-MIT
