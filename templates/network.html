@@ -140,7 +140,9 @@
                 return free >= 0 ? free : lanes.length;
             })();
             commit.lane = lane;
-            lanes[lane] = null;
+            // Clear ALL slots holding this hash (not just the first) to prevent
+            // phantom lanes when a commit is the parent of multiple children.
+            for (let i = 0; i < lanes.length; i++) { if (lanes[i] === commit.hash) lanes[i] = null; }
 
             commit.parents.forEach((ph, pi) => {
                 if (pi === 0) {
@@ -292,7 +294,6 @@
                 .attr('stroke', '#0d1117').attr('stroke-width', 2.5)
                 .style('cursor', 'pointer')
                 .on('mousemove', ev => showTip(ev, commit))
-                .on('mousemove', ev => { showTip(ev, commit); moveTip(ev); })
                 .on('mouseleave', hideTip)
                 .on('click', () => window.location.href = `/${OWNER}/${REPO}/commit/${commit.hash}`);
         });
@@ -320,7 +321,7 @@
                 ? commit.message.slice(0, MSG_MAX_CHARS - 1) + '…'
                 : commit.message;
 
-            g.append('text')
+            const msgEl = g.append('text')
                 .attr('x', msgX).attr('y', mid)
                 .attr('fill', '#e6edf3')
                 .attr('font-size', '13px')
@@ -330,6 +331,10 @@
                 .on('mousemove', ev => { showTip(ev, commit); moveTip(ev); })
                 .on('mouseleave', hideTip)
                 .on('click', () => window.location.href = `/${OWNER}/${REPO}/commit/${commit.hash}`);
+            // Clamp rendered width only when text actually overflows the column
+            if (maxMsgW > 0 && msgEl.node().getComputedTextLength() > maxMsgW) {
+                msgEl.attr('textLength', maxMsgW).attr('lengthAdjust', 'spacingAndGlyphs');
+            }
 
             // Author · time (right-aligned)
             g.append('text')
