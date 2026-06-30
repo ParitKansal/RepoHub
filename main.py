@@ -2,7 +2,7 @@ import os
 import re
 import markdown
 from fastapi import FastAPI, Request, Depends, Form, Cookie, status, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -366,6 +366,57 @@ async def repo_branches(request: Request, username: str, repo_name: str, db: Ses
         "owner": owner,
         "branches": branches
     })
+
+@app.get("/{username}/{repo_name}/network", response_class=HTMLResponse)
+async def repo_network(request: Request, username: str, repo_name: str, branch: str = "__all__", db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "User not found", "user": auth.get_current_user_from_cookie(request, db)})
+
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id,
+        models.Repository.name == repo_name
+    ).first()
+
+    current_user = auth.get_current_user_from_cookie(request, db)
+
+    if not repo or (repo.is_private and (not current_user or current_user.id != owner.id)):
+        return templates.TemplateResponse(request=request, name="error.html", context={"error": "Repository not found", "user": current_user})
+
+    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    branches = []
+    if not git_utils.is_repo_empty(repo_path):
+        branches = git_utils.get_branches(repo_path)
+
+    return templates.TemplateResponse(request=request, name="network.html", context={
+        "user": current_user,
+        "repo": repo,
+        "owner": owner,
+        "branches": branches,
+        "current_branch": branch
+    })
+
+@app.get("/{username}/{repo_name}/graph-data")
+async def repo_graph_data(username: str, repo_name: str, branch: str = "__all__", db: Session = Depends(get_db)):
+    owner = db.query(models.User).filter(models.User.username == username).first()
+    if not owner:
+        return JSONResponse({"error": "User not found"}, status_code=404)
+
+    repo = db.query(models.Repository).filter(
+        models.Repository.owner_id == owner.id,
+        models.Repository.name == repo_name
+    ).first()
+
+    if not repo:
+        return JSONResponse({"error": "Repository not found"}, status_code=404)
+
+    repo_path = os.path.join(REPOS_DIR, owner.username, f"{repo.name}.git")
+    if git_utils.is_repo_empty(repo_path):
+        return JSONResponse({"commits": [], "branch_tips": {}})
+
+    commits = git_utils.get_commit_graph(repo_path, branch, limit=80)
+    branch_tips = git_utils.get_branch_tips(repo_path)
+    return JSONResponse({"commits": commits, "branch_tips": branch_tips})
 
 @app.get("/{username}/{repo_name}/pulls", response_class=HTMLResponse)
 async def repo_pulls(request: Request, username: str, repo_name: str, db: Session = Depends(get_db)):

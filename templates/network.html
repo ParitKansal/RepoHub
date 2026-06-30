@@ -1,0 +1,343 @@
+{% extends "repo_base.html" %}
+{% set current_tab = 'network' %}
+
+{% block repo_content %}
+<div class="mt-4">
+    <div class="mb-4 flex justify-between items-center">
+        <h3 class="text-xl font-semibold text-white">Commit Network</h3>
+
+        {% if branches %}
+        <div class="flex items-center space-x-3">
+            <a href="?branch=__all__" class="text-xs px-3 py-1.5 rounded border {% if current_branch == '__all__' %}bg-github-blue border-github-blue text-white{% else %}border-github-border text-gray-400 hover:text-white hover:border-gray-500{% endif %}">
+                All branches
+            </a>
+            <div class="relative inline-block text-left">
+                <button type="button" id="branch-menu-button-network"
+                    onclick="document.getElementById('branch-dropdown-network').classList.toggle('hidden')"
+                    class="inline-flex justify-center w-full rounded-md border border-github-border shadow-sm px-4 py-2 bg-github-dark text-sm font-medium text-white hover:bg-gray-800 focus:outline-none">
+                    <i class="fa-solid fa-code-branch mr-2 text-gray-400"></i>
+                    {% if current_branch == '__all__' %}All branches{% else %}{{ current_branch }}{% endif %}
+                    <i class="fa-solid fa-caret-down ml-2 -mr-1 text-gray-400"></i>
+                </button>
+                <div id="branch-dropdown-network"
+                    class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-github-header border border-github-border ring-1 ring-black ring-opacity-5 hidden z-10">
+                    <div class="py-1">
+                        <div class="px-4 py-2 text-xs font-semibold text-gray-400 border-b border-github-border">Filter by branch</div>
+                        {% for b in branches %}
+                        <a href="?branch={{ b }}"
+                            class="text-white hover:bg-github-blue block px-4 py-2 text-sm {% if b == current_branch %}bg-gray-800 font-bold{% endif %}">
+                            <i class="fa-solid fa-check mr-2 {% if b != current_branch %}invisible{% endif %}"></i>{{ b }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            window.addEventListener('click', function(e) {
+                if (!e.target.closest('#branch-menu-button-network')) {
+                    var d = document.getElementById('branch-dropdown-network');
+                    if (d && !d.classList.contains('hidden')) d.classList.add('hidden');
+                }
+            });
+        </script>
+        {% endif %}
+    </div>
+
+    <!-- Branch color legend -->
+    <div id="legend" class="mb-3 flex flex-wrap gap-3 text-xs text-gray-400 min-h-[20px]"></div>
+
+    <!-- Graph card -->
+    <div class="border border-github-border rounded-lg bg-github-dark overflow-hidden">
+        <div id="graph-loading" class="p-12 text-center text-gray-500">
+            <i class="fa-solid fa-spinner fa-spin text-3xl mb-3"></i>
+            <p>Loading graph…</p>
+        </div>
+        <div id="graph-empty" class="p-12 text-center text-gray-500 hidden">
+            <i class="fa-solid fa-diagram-project text-4xl mb-3 opacity-40"></i>
+            <p>No commits yet.</p>
+        </div>
+        <!-- Scrollable graph area -->
+        <div id="graph-wrap" class="hidden" style="overflow:auto; max-height:620px;">
+            <svg id="graph-svg" style="display:block; min-width:100%;"></svg>
+        </div>
+    </div>
+</div>
+
+<!-- Tooltip (fixed position, follows cursor) -->
+<div id="graph-tooltip"
+    style="position:fixed;pointer-events:none;display:none;z-index:9999;max-width:320px;"
+    class="bg-github-header border border-github-border rounded-lg shadow-xl p-3 text-sm">
+    <div id="tt-hash" class="font-mono text-github-blue text-xs mb-1"></div>
+    <div id="tt-msg" class="text-white font-semibold mb-1 break-words leading-snug"></div>
+    <div id="tt-meta" class="text-gray-400 text-xs"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script>
+(function () {
+    const OWNER  = {{ owner.username | tojson }};
+    const REPO   = {{ repo.name | tojson }};
+    const BRANCH = {{ current_branch | tojson }};
+
+    /* ── Layout constants ───────────────────────────────────── */
+    const ROW_H   = 42;   // px per row
+    const LANE_W  = 22;   // px per graph lane
+    const R       = 6;    // circle radius
+    const PAD_L   = 14;   // left padding inside SVG
+    const PAD_T   = 16;   // top padding
+    const LANE_PAD = 20;  // gap between graph column and text column
+    const HASH_W  = 58;   // width reserved for short-hash text
+    const MSG_MAX_CHARS = 55;
+
+    const COLORS = [
+        '#58a6ff','#3fb950','#f78166','#d2a8ff',
+        '#ffa657','#79c0ff','#56d364','#ff7b72'
+    ];
+
+    /* ── Tooltip helpers ────────────────────────────────────── */
+    const tooltip = document.getElementById('graph-tooltip');
+    function showTip(event, commit) {
+        document.getElementById('tt-hash').textContent = commit.hash;
+        document.getElementById('tt-msg').textContent  = commit.message;
+        document.getElementById('tt-meta').textContent = `${commit.author} · ${commit.time_ago}`;
+        tooltip.style.display = 'block';
+        moveTip(event);
+    }
+    function moveTip(event) {
+        const vw = window.innerWidth, vh = window.innerHeight;
+        let x = event.clientX + 16, y = event.clientY - 10;
+        if (x + 340 > vw) x = event.clientX - 340;
+        if (y + 100 > vh) y = event.clientY - 100;
+        tooltip.style.left = x + 'px';
+        tooltip.style.top  = y + 'px';
+    }
+    function hideTip() { tooltip.style.display = 'none'; }
+
+    /* ── Lane assignment ────────────────────────────────────── */
+    function assignLanes(commits) {
+        // lanes[i] = hash currently occupying lane i (null = free)
+        const lanes = [];
+        commits.forEach(commit => {
+            const existing = lanes.indexOf(commit.hash);
+            let lane = existing >= 0 ? existing : (() => {
+                const free = lanes.indexOf(null);
+                return free >= 0 ? free : lanes.length;
+            })();
+            commit.lane = lane;
+            lanes[lane] = null;
+
+            commit.parents.forEach((ph, pi) => {
+                if (pi === 0) {
+                    lanes[lane] = ph;
+                } else {
+                    const fl = lanes.indexOf(null);
+                    const nl = fl >= 0 ? fl : lanes.length;
+                    lanes[nl] = ph;
+                }
+            });
+        });
+        return Math.max(0, ...commits.map(c => c.lane));
+    }
+
+    /* ── Main fetch & render ────────────────────────────────── */
+    async function load() {
+        const url = `/${OWNER}/${REPO}/graph-data?branch=${encodeURIComponent(BRANCH)}`;
+        let data;
+        try {
+            const res = await fetch(url);
+            data = await res.json();
+        } catch (e) {
+            document.getElementById('graph-loading').innerHTML =
+                '<p class="text-red-400">Failed to load graph data.</p>';
+            return;
+        }
+        document.getElementById('graph-loading').classList.add('hidden');
+        if (!data.commits || data.commits.length === 0) {
+            document.getElementById('graph-empty').classList.remove('hidden');
+            return;
+        }
+        render(data.commits, data.branch_tips || {});
+    }
+
+    function render(commits, branchTips) {
+        /* ── index & lane setup ── */
+        const indexOf = {};
+        commits.forEach((c, i) => { indexOf[c.hash] = i; });
+
+        const maxLane  = assignLanes(commits);
+        const laneCount = maxLane + 1;
+
+        /* ── stable lane colors ── */
+        const laneColor = {};
+        commits.forEach(c => {
+            if (laneColor[c.lane] === undefined)
+                laneColor[c.lane] = COLORS[c.lane % COLORS.length];
+        });
+
+        /* ── SVG geometry ── */
+        // Graph column ends here (x coords of circles stay here)
+        const graphColW = PAD_L + laneCount * LANE_W;
+        // Text column starts after a gap
+        const textX = graphColW + LANE_PAD;
+
+        // Measure the container width for responsive sizing
+        const wrap = document.getElementById('graph-wrap');
+        wrap.classList.remove('hidden');
+        const containerW = Math.max(wrap.clientWidth || 0, 700);
+        const totalW = Math.max(containerW, textX + HASH_W + 240);
+        const totalH = PAD_T * 2 + commits.length * ROW_H;
+
+        const svg = d3.select('#graph-svg')
+            .attr('width', totalW)
+            .attr('height', totalH);
+
+        const g = svg.append('g');
+
+        const cx = lane => PAD_L + lane * LANE_W + LANE_W / 2;
+        const cy = row  => PAD_T + row * ROW_H;
+
+        /* ── Row dividers (drawn first, behind everything) ── */
+        commits.forEach((_, i) => {
+            if (i === 0) return;
+            g.append('line')
+                .attr('x1', 0)         .attr('y1', cy(i) - ROW_H / 2)
+                .attr('x2', totalW)    .attr('y2', cy(i) - ROW_H / 2)
+                .attr('stroke', '#161b22')
+                .attr('stroke-width', 1);
+        });
+
+        /* ── Edges ── */
+        // Draw edges BEHIND circles. For cross-lane edges we "stay in lane"
+        // (vertical segment) all the way down, then make a short curve into the
+        // parent's lane in the final row-gap. This prevents long arcing lines
+        // from fanning across the whole graph when multiple branches share a
+        // common ancestor.
+        commits.forEach((commit, ri) => {
+            commit.parents.forEach(ph => {
+                const pi = indexOf[ph];
+                if (pi === undefined) return;
+                const parent = commits[pi];
+                const x1 = cx(commit.lane), y1 = cy(ri);
+                const x2 = cx(parent.lane), y2 = cy(pi);
+                const color = laneColor[commit.lane] || COLORS[0];
+
+                if (commit.lane === parent.lane) {
+                    // Same lane → straight vertical line
+                    g.append('line')
+                        .attr('x1', x1).attr('y1', y1 + R + 1)
+                        .attr('x2', x2).attr('y2', y2 - R - 1)
+                        .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
+                } else {
+                    // Different lane:
+                    //  1. Stay vertical in the child's lane until one row above parent
+                    //  2. Short S-curve into the parent's lane
+                    const junctionY = y2 - ROW_H;          // one row above parent
+                    const c1 = ROW_H * 0.55;               // bezier ctrl-pt offsets
+
+                    if (junctionY > y1 + R + 4) {
+                        // Vertical rail segment
+                        g.append('line')
+                            .attr('x1', x1).attr('y1', y1 + R + 1)
+                            .attr('x2', x1).attr('y2', junctionY)
+                            .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
+
+                        // Short curve from junction into parent circle
+                        g.append('path')
+                            .attr('d', `M${x1},${junctionY} C${x1},${junctionY + c1} ${x2},${y2 - c1} ${x2},${y2 - R}`)
+                            .attr('fill', 'none')
+                            .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
+                    } else {
+                        // Adjacent rows — just a short S-curve the whole way
+                        g.append('path')
+                            .attr('d', `M${x1},${y1 + R} C${x1},${y1 + c1} ${x2},${y2 - c1} ${x2},${y2 - R}`)
+                            .attr('fill', 'none')
+                            .attr('stroke', color).attr('stroke-width', 2).attr('opacity', 0.85);
+                    }
+                }
+            });
+        });
+
+        /* ── Circles ── */
+        commits.forEach((commit, ri) => {
+            const x = cx(commit.lane), y = cy(ri);
+            const color = laneColor[commit.lane] || COLORS[0];
+            const isMerge = commit.parents.length > 1;
+
+            g.append('circle')
+                .attr('cx', x).attr('cy', y)
+                .attr('r', isMerge ? R + 2 : R)
+                .attr('fill', color)
+                .attr('stroke', '#0d1117').attr('stroke-width', 2.5)
+                .style('cursor', 'pointer')
+                .on('mousemove', ev => showTip(ev, commit))
+                .on('mousemove', ev => { showTip(ev, commit); moveTip(ev); })
+                .on('mouseleave', hideTip)
+                .on('click', () => window.location.href = `/${OWNER}/${REPO}/commit/${commit.hash}`);
+        });
+
+        /* ── Text column ── */
+        commits.forEach((commit, ri) => {
+            const y   = cy(ri);
+            const mid = y + 5; // baseline offset to vertically centre text in row
+
+            // Short hash
+            const hashEl = g.append('text')
+                .attr('x', textX)
+                .attr('y', mid)
+                .attr('fill', '#58a6ff')
+                .attr('font-size', '11px')
+                .attr('font-family', 'ui-monospace,SFMono-Regular,monospace')
+                .style('cursor', 'pointer')
+                .text(commit.short_hash)
+                .on('click', () => window.location.href = `/${OWNER}/${REPO}/commit/${commit.hash}`);
+
+            // Commit message
+            const msgX = textX + HASH_W + 8;
+            const maxMsgW = totalW - msgX - 190;
+            const msg = commit.message.length > MSG_MAX_CHARS
+                ? commit.message.slice(0, MSG_MAX_CHARS - 1) + '…'
+                : commit.message;
+
+            g.append('text')
+                .attr('x', msgX).attr('y', mid)
+                .attr('fill', '#e6edf3')
+                .attr('font-size', '13px')
+                .attr('font-family', 'system-ui,sans-serif')
+                .style('cursor', 'pointer')
+                .text(msg)
+                .on('mousemove', ev => { showTip(ev, commit); moveTip(ev); })
+                .on('mouseleave', hideTip)
+                .on('click', () => window.location.href = `/${OWNER}/${REPO}/commit/${commit.hash}`);
+
+            // Author · time (right-aligned)
+            g.append('text')
+                .attr('x', totalW - 10).attr('y', mid)
+                .attr('text-anchor', 'end')
+                .attr('fill', '#6e7681')
+                .attr('font-size', '11px')
+                .attr('font-family', 'system-ui,sans-serif')
+                .text(`${commit.author} · ${commit.time_ago}`);
+        });
+
+        /* ── Legend ── */
+        const legendEl = document.getElementById('legend');
+        const seenBranches = new Set();
+        Object.entries(branchTips).forEach(([name, hash]) => {
+            const idx = indexOf[hash];
+            if (idx === undefined) return;
+            const color = laneColor[commits[idx].lane] || COLORS[0];
+            if (seenBranches.has(name)) return;
+            seenBranches.add(name);
+            const span = document.createElement('span');
+            span.className = 'flex items-center gap-1.5';
+            span.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
+                <span style="color:${color};font-family:monospace;font-size:11px">${name}</span>`;
+            legendEl.appendChild(span);
+        });
+    }
+
+    load();
+})();
+</script>
+{% endblock %}

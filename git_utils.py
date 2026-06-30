@@ -244,6 +244,53 @@ def get_branch_diff(repo_path: str, target_branch: str, source_branch: str) -> l
     except subprocess.CalledProcessError:
         return []
 
+def get_commit_graph(repo_path: str, branch: str = "__all__", limit: int = 80) -> list:
+    if is_repo_empty(repo_path):
+        return []
+    try:
+        if branch == "__all__":
+            log_args = ["git", "log", "--all", "-n", str(limit), "--pretty=format:%H|%P|%an|%ar|%s", "--topo-order"]
+        else:
+            log_args = ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%P|%an|%ar|%s", "--topo-order"]
+        result = subprocess.run(log_args, cwd=repo_path, check=True, capture_output=True, text=True)
+        commits = []
+        for line in result.stdout.strip().split('\n'):
+            if not line:
+                continue
+            parts = line.split('|', 4)
+            if len(parts) < 5:
+                continue
+            full_hash, parents_raw, author, time_ago, message = parts
+            parents = [p for p in parents_raw.split(' ') if p]
+            commits.append({
+                "hash": full_hash,
+                "short_hash": full_hash[:7],
+                "parents": parents,
+                "author": author,
+                "time_ago": time_ago,
+                "message": message
+            })
+        return commits
+    except subprocess.CalledProcessError:
+        return []
+
+def get_branch_tips(repo_path: str) -> dict:
+    if is_repo_empty(repo_path):
+        return {}
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--format=%(refname:short)|%(objectname)"],
+            cwd=repo_path, check=True, capture_output=True, text=True
+        )
+        tips = {}
+        for line in result.stdout.strip().split('\n'):
+            if '|' in line:
+                name, commit_hash = line.split('|', 1)
+                tips[name.strip()] = commit_hash.strip()
+        return tips
+    except subprocess.CalledProcessError:
+        return {}
+
 def merge_branches(repo_path: str, target_branch: str, source_branch: str, author_name: str, author_email: str) -> bool:
     """
     Attempts to merge source_branch into target_branch.
