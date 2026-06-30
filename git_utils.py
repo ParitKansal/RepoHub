@@ -35,6 +35,8 @@ def get_branches(repo_path: str) -> list:
             text=True
         )
         branches = [b.strip() for b in result.stdout.strip().split('\n') if b.strip()]
+        priority = {'main': 0, 'master': 1}
+        branches.sort(key=lambda b: (priority.get(b, 2), b))
         return branches
     except subprocess.CalledProcessError:
         return []
