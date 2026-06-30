@@ -249,7 +249,16 @@ def get_commit_graph(repo_path: str, branch: str = "__all__", limit: int = 80) -
         return []
     try:
         if branch == "__all__":
-            log_args = ["git", "log", "--all", "-n", str(limit), "--pretty=format:%H|%P|%an|%ar|%s", "--topo-order"]
+            # List main/master first so it always occupies lane 0 in topo-order.
+            # Fall back to --all if neither exists.
+            all_branches = get_branches(repo_path)
+            if "main" in all_branches:
+                ordered = ["main"] + [b for b in all_branches if b != "main"]
+            elif "master" in all_branches:
+                ordered = ["master"] + [b for b in all_branches if b != "master"]
+            else:
+                ordered = all_branches
+            log_args = ["git", "log"] + ordered + ["-n", str(limit), "--pretty=format:%H|%P|%an|%ar|%s", "--topo-order"]
         else:
             log_args = ["git", "log", branch, "-n", str(limit), "--pretty=format:%H|%P|%an|%ar|%s", "--topo-order"]
         result = subprocess.run(log_args, cwd=repo_path, check=True, capture_output=True, text=True)
