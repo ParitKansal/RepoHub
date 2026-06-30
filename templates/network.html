@@ -90,11 +90,20 @@
     const HASH_W  = 58;   // width reserved for short-hash text
     const MSG_MAX_CHARS = 55;
 
-    // Generate a visually distinct color for any lane index using the
-    // golden-angle hue distribution — adjacent lanes always get maximally
-    // separated hues, so this works correctly for 2 branches or 200.
+    // Blue hue (~213°) is reserved exclusively for main/master.
+    // All other lanes use golden-angle distribution but skip the blue zone.
+    const MAIN_BLUE = '#58a6ff';
+    const BLUE_HUE  = 213;
+    const BLUE_ZONE = 30; // degrees either side of BLUE_HUE to avoid
+
     function laneToColor(lane) {
-        const hue = (lane * 137.508) % 360;
+        let hue = (lane * 137.508) % 360;
+        // Circular distance to the reserved blue hue
+        const dist = Math.min(Math.abs(hue - BLUE_HUE), 360 - Math.abs(hue - BLUE_HUE));
+        if (dist < BLUE_ZONE) {
+            // Nudge past the forbidden zone
+            hue = (hue + BLUE_ZONE * 2) % 360;
+        }
         return `hsl(${hue.toFixed(1)}, 72%, 62%)`;
     }
 
@@ -181,7 +190,7 @@
         // main/master is always blue regardless of which lane it landed in
         const mainHash = branchTips['main'] || branchTips['master'];
         if (mainHash !== undefined && indexOf[mainHash] !== undefined) {
-            laneColor[commits[indexOf[mainHash]].lane] = '#58a6ff';
+            laneColor[commits[indexOf[mainHash]].lane] = MAIN_BLUE;
         }
 
         /* ── SVG geometry ── */
